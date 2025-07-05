@@ -28,6 +28,10 @@ env:
   IMAGE_NAME: 'k8s-custom-controller'
   HELM_CHART_NAME: 'k8s-custom-controller'
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
