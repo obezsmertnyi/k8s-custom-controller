@@ -69,7 +69,7 @@ Example:
 		go func() {
 			log.Info().Msg("Press Ctrl+C to stop the server")
 			if err := server.ListenAndServe(addr); err != nil {
-				// FastHTTP не має константи ErrServerClosed, тому просто логуємо помилку
+				// FastHTTP doesn't have ErrServerClosed, so we just log the error
 				log.Error().Err(err).Msg("Server stopped")
 				cancel() // Cancel context on server error
 			}
@@ -77,10 +77,10 @@ Example:
 
 		// Wait for termination signal
 		select {
-			case <-sigCh:
-				log.Info().Msg("Shutdown signal received, stopping server...")
-			case <-ctx.Done():
-				log.Info().Msg("Server stopped due to error")
+		case <-sigCh:
+			log.Info().Msg("Shutdown signal received, stopping server...")
+		case <-ctx.Done():
+			log.Error().Msg("Server stopped due to error")
 		}
 
 		// Shutdown with timeout

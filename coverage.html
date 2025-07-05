@@ -1,0 +1,575 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>cmd: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/obezsmertnyi/k8s-custom-controller/cmd/config.go (0.0%)</option>
+				
+				<option value="file1">github.com/obezsmertnyi/k8s-custom-controller/cmd/root.go (0.0%)</option>
+				
+				<option value="file2">github.com/obezsmertnyi/k8s-custom-controller/cmd/server.go (0.0%)</option>
+				
+				<option value="file3">github.com/obezsmertnyi/k8s-custom-controller/main.go (0.0%)</option>
+				
+				<option value="file4">github.com/obezsmertnyi/k8s-custom-controller/tests/mock_config.go (100.0%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">package cmd
+
+import (
+        "fmt"
+        "os"
+        "path/filepath"
+        "strings"
+        "time"
+
+        "github.com/rs/zerolog/log"
+        "github.com/spf13/cobra"
+        "github.com/spf13/viper"
+)
+
+// Config structure for storing application configuration
+type Config struct {
+        // Kubernetes settings
+        Kubernetes struct {
+                Kubeconfig string        `mapstructure:"kubeconfig"`
+                Context    string        `mapstructure:"context"`
+                Namespace  string        `mapstructure:"namespace"`
+                Timeout    time.Duration `mapstructure:"timeout"`
+                QPS        float32       `mapstructure:"qps"`
+                Burst      int           `mapstructure:"burst"`
+                InCluster  bool          `mapstructure:"in_cluster"`
+        } `mapstructure:"kubernetes"`
+
+        // Logging settings
+        Logging struct {
+                Level  string `mapstructure:"level"`
+                Format string `mapstructure:"format"`
+        } `mapstructure:"logging"`
+}
+
+// homeDir returns the path to the user's home directory
+func homeDir() string <span class="cov0" title="0">{
+        if h := os.Getenv("HOME"); h != "" </span><span class="cov0" title="0">{
+                return h
+        }</span>
+        <span class="cov0" title="0">return ""</span>
+}
+
+// LoadConfig loads configuration from file and environment variables
+// Exported function for use in tests and other packages
+func LoadConfig() (*Config, error) <span class="cov0" title="0">{
+        config := &amp;Config{}
+
+        // Set default values
+        config.Kubernetes.Timeout = 30 * time.Second
+        config.Kubernetes.QPS = 50
+        config.Kubernetes.Burst = 100
+        config.Kubernetes.Namespace = "default"
+        config.Logging.Level = "info"
+        config.Logging.Format = "text"
+
+        // Set default kubeconfig path
+        if home := homeDir(); home != "" </span><span class="cov0" title="0">{
+                config.Kubernetes.Kubeconfig = filepath.Join(home, ".kube", "config")
+        }</span>
+
+        // Configure Viper
+        <span class="cov0" title="0">if cfgFile != "" </span><span class="cov0" title="0">{
+                // Use configuration file specified via --config flag
+                viper.SetConfigFile(cfgFile)
+        }</span> else<span class="cov0" title="0"> {
+                // Look for default configuration file
+                viper.SetConfigName("config")
+                viper.SetConfigType("yaml")
+        }</span>
+
+        // Search for configuration file in standard locations
+        <span class="cov0" title="0">viper.AddConfigPath(".")
+        viper.AddConfigPath("$HOME/.k8s-custom-controller")
+        viper.AddConfigPath("/etc/k8s-custom-controller")
+
+        // Automatically use environment variables
+        viper.AutomaticEnv()
+        viper.SetEnvPrefix("KCUSTOM") // KCUSTOM_KUBERNETES_NAMESPACE
+        viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+
+        // Explicitly bind environment variables to configuration keys
+        viper.BindEnv("kubernetes.namespace")
+        viper.BindEnv("kubernetes.kubeconfig")
+        viper.BindEnv("kubernetes.qps")
+        viper.BindEnv("kubernetes.burst")
+        viper.BindEnv("kubernetes.timeout")
+        viper.BindEnv("kubernetes.in_cluster")
+        viper.BindEnv("logging.level")
+        viper.BindEnv("logging.format")
+
+        // Try to read configuration file
+        if err := viper.ReadInConfig(); err == nil </span><span class="cov0" title="0">{
+                log.Info().Msgf("Using config file: %s", viper.ConfigFileUsed())
+        }</span> else<span class="cov0" title="0"> {
+                if _, ok := err.(viper.ConfigFileNotFoundError); !ok </span><span class="cov0" title="0">{
+                        return nil, fmt.Errorf("error reading config file: %v", err)
+                }</span>
+                <span class="cov0" title="0">log.Warn().Msg("No config file found, using defaults and environment variables")</span>
+        }
+
+        // Bind environment variables to configuration
+        <span class="cov0" title="0">err := viper.Unmarshal(config)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("unable to decode config: %v", err)
+        }</span>
+
+        // Override values from command line flags
+        <span class="cov0" title="0">if logLevel != "" </span><span class="cov0" title="0">{
+                config.Logging.Level = logLevel
+        }</span>
+
+        <span class="cov0" title="0">return config, nil</span>
+}
+
+// ConfigCmd creates a command for working with configuration
+func ConfigCmd() *cobra.Command <span class="cov0" title="0">{
+        configCmd := &amp;cobra.Command{
+                Use:   "config",
+                Short: "Manage configuration",
+                Long:  "View and manage configuration for k8s-custom-controller",
+        }
+
+        configViewCmd := &amp;cobra.Command{
+                Use:   "view",
+                Short: "View current configuration",
+                Long:  "Display the current configuration being used",
+                Run: func(cmd *cobra.Command, args []string) </span><span class="cov0" title="0">{
+                        config, err := LoadConfig()
+                        if err != nil </span><span class="cov0" title="0">{
+                                log.Error().Err(err).Msg("Failed to load configuration")
+                                return
+                        }</span>
+
+                        <span class="cov0" title="0">fmt.Println("Current Configuration:")
+                        fmt.Println("Kubernetes:")
+                        fmt.Printf("  Kubeconfig: %s\n", config.Kubernetes.Kubeconfig)
+                        fmt.Printf("  Context: %s\n", config.Kubernetes.Context)
+                        fmt.Printf("  Namespace: %s\n", config.Kubernetes.Namespace)
+                        fmt.Printf("  Timeout: %s\n", config.Kubernetes.Timeout)
+                        fmt.Printf("  QPS: %f\n", config.Kubernetes.QPS)
+                        fmt.Printf("  Burst: %d\n", config.Kubernetes.Burst)
+                        fmt.Printf("  InCluster: %t\n", config.Kubernetes.InCluster)
+                        fmt.Println("Logging:")
+                        fmt.Printf("  Level: %s\n", config.Logging.Level)
+                        fmt.Printf("  Format: %s\n", config.Logging.Format)</span>
+                },
+        }
+
+        <span class="cov0" title="0">configCmd.AddCommand(configViewCmd)
+        return configCmd</span>
+}
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">package cmd
+
+import (
+        "fmt"
+        "os"
+        "strings"
+
+        "github.com/rs/zerolog"
+        "github.com/rs/zerolog/log"
+        "github.com/spf13/cobra"
+)
+
+var (
+        logLevel string
+        cfgFile  string
+)
+
+var rootCmd = &amp;cobra.Command{
+        Use:   "k8s-cli",
+        Short: "Kubernetes custom controller and CLI tool",
+        Long: `k8s-cli is a CLI tool and custom controller for Kubernetes.
+
+It provides functionality for interacting with Kubernetes clusters,
+managing resources, and implementing custom controllers.
+
+Supports configuration via config files, command-line flags, and environment variables.`,
+        Run: func(cmd *cobra.Command, args []string) <span class="cov0" title="0">{
+                // Load configuration
+                config, err := LoadConfig()
+                if err != nil </span><span class="cov0" title="0">{
+                        log.Error().Err(err).Msg("Failed to load configuration")
+                        return
+                }</span>
+
+                // Configure logging based on configuration
+                <span class="cov0" title="0">level := parseLogLevel(config.Logging.Level)
+                configureLogger(level, config.Logging.Format)
+
+                // Demonstration of different logging levels
+                log.Info().Msg("This is an info log")
+                log.Debug().Msg("This is a debug log")
+                log.Trace().Msg("This is a trace log")
+                log.Warn().Msg("This is a warn log")
+                log.Error().Msg("This is an error log")
+
+                // Display configuration information
+                log.Info().Str("namespace", config.Kubernetes.Namespace).Msg("Using Kubernetes namespace")
+                log.Info().Bool("in_cluster", config.Kubernetes.InCluster).Msg("Kubernetes client mode")
+
+                fmt.Println("Welcome to k8s-custom-controller CLI!")</span>
+        },
+}
+
+func parseLogLevel(lvl string) zerolog.Level <span class="cov0" title="0">{
+        switch strings.ToLower(lvl) </span>{
+        case "trace":<span class="cov0" title="0">
+                return zerolog.TraceLevel</span>
+        case "debug":<span class="cov0" title="0">
+                return zerolog.DebugLevel</span>
+        case "info":<span class="cov0" title="0">
+                return zerolog.InfoLevel</span>
+        case "warn":<span class="cov0" title="0">
+                return zerolog.WarnLevel</span>
+        case "error":<span class="cov0" title="0">
+                return zerolog.ErrorLevel</span>
+        default:<span class="cov0" title="0">
+                return zerolog.InfoLevel</span>
+        }
+}
+
+// configureLogger sets up the zerolog logger with the specified level and format
+func configureLogger(level zerolog.Level, format string) <span class="cov0" title="0">{
+        zerolog.TimeFieldFormat = zerolog.TimeFormatUnixMs
+        zerolog.SetGlobalLevel(level)
+
+        // Configure logging format based on configuration
+        switch strings.ToLower(format) </span>{
+        case "json":<span class="cov0" title="0">
+                // JSON format for structured logging (better for machine processing)
+                logger := zerolog.New(os.Stderr).With().Timestamp()
+                if level == zerolog.TraceLevel </span><span class="cov0" title="0">{
+                        logger = logger.Caller()
+                }</span>
+                <span class="cov0" title="0">log.Logger = logger.Logger()</span>
+        default:<span class="cov0" title="0"> // "text" or any other format
+                // Console format for better human readability
+                console := zerolog.ConsoleWriter{
+                        Out:        os.Stderr,
+                        TimeFormat: "2006-01-02 15:04:05.000",
+                }
+
+                if level == zerolog.TraceLevel </span><span class="cov0" title="0">{
+                        zerolog.CallerMarshalFunc = func(pc uintptr, file string, line int) string </span><span class="cov0" title="0">{
+                                return fmt.Sprintf("%s:%d", file, line)
+                        }</span>
+                        <span class="cov0" title="0">zerolog.CallerFieldName = "caller"
+                        console.PartsOrder = []string{
+                                zerolog.TimestampFieldName,
+                                zerolog.LevelFieldName,
+                                zerolog.CallerFieldName,
+                                zerolog.MessageFieldName,
+                        }
+                        log.Logger = log.Output(console).With().Caller().Logger()</span>
+                } else<span class="cov0" title="0"> {
+                        console.PartsOrder = []string{
+                                zerolog.TimestampFieldName,
+                                zerolog.LevelFieldName,
+                                zerolog.MessageFieldName,
+                        }
+                        log.Logger = log.Output(console)
+                }</span>
+        }
+}
+
+func setupLogging() <span class="cov0" title="0">{
+        logFormat := "text"
+        if envFormat := os.Getenv("KCUSTOM_LOGGING_FORMAT"); envFormat != "" </span><span class="cov0" title="0">{
+                logFormat = envFormat
+        }</span>
+        <span class="cov0" title="0">configureLogger(parseLogLevel("info"), logFormat)</span>
+}
+
+func Execute() error <span class="cov0" title="0">{
+        setupLogging()
+
+        config, err := LoadConfig()
+        if err != nil </span><span class="cov0" title="0">{
+                log.Error().Err(err).Msg("Failed to load configuration")
+                return err
+        }</span>
+
+        <span class="cov0" title="0">level := parseLogLevel(config.Logging.Level)
+        configureLogger(level, config.Logging.Format)
+
+        return rootCmd.Execute()</span>
+}
+
+func init() <span class="cov0" title="0">{
+        rootCmd.PersistentFlags().StringVar(&amp;logLevel, "log-level", "info", "Set log level: trace, debug, info, warn, error")
+        rootCmd.PersistentFlags().StringVar(&amp;cfgFile, "config", "", "Config file path (default is $HOME/.k8s-custom-controller/config.yaml)")
+        rootCmd.AddCommand(ConfigCmd())
+}</span>
+</pre>
+		
+		<pre class="file" id="file2" style="display: none">package cmd
+
+import (
+        "context"
+        "fmt"
+        "os"
+        "os/signal"
+        "syscall"
+        "time"
+
+        "github.com/rs/zerolog/log"
+        "github.com/spf13/cobra"
+        "github.com/valyala/fasthttp"
+)
+
+var (
+        serverPort int
+        serverHost string
+)
+
+// requestHandler processes HTTP requests with logging
+func requestHandler(ctx *fasthttp.RequestCtx) <span class="cov0" title="0">{
+        start := time.Now()
+        method := string(ctx.Method())
+        path := string(ctx.Path())
+        clientIP := ctx.RemoteIP().String()
+
+        // Log request details at debug level
+        log.Debug().Str("method", method).Str("path", path).Str("client", clientIP).Msg("Request received")
+
+        // Set content type and respond
+        ctx.SetContentType("text/plain; charset=utf8")
+        fmt.Fprintf(ctx, "Hello from FastHTTP! You requested: %s from IP: %s", path, clientIP)
+
+        // Log response details at info level
+        log.Info().Str("method", method).Str("path", path).Str("client", clientIP).Int("status", ctx.Response.StatusCode()).Dur("duration", time.Since(start)).Msg("Request processed")
+}</span>
+
+var serverCmd = &amp;cobra.Command{
+        Use:   "server",
+        Short: "Start a FastHTTP server",
+        Long: `Start a FastHTTP server with configurable host and port.
+
+Example:
+  k8s-cli server --host 0.0.0.0 --port 8080`,
+        Run: func(cmd *cobra.Command, args []string) <span class="cov0" title="0">{
+                addr := fmt.Sprintf("%s:%d", serverHost, serverPort)
+                log.Info().Msgf("Starting FastHTTP server on %s", addr)
+
+                // Configure server with sensible defaults
+                server := &amp;fasthttp.Server{
+                        Handler:      requestHandler,
+                        ReadTimeout:  10 * time.Second,
+                        WriteTimeout: 10 * time.Second,
+                        IdleTimeout:  60 * time.Second,
+                        // 10MB max request size for safety
+                        MaxRequestBodySize: 10 * 1024 * 1024,
+                }
+
+                // Create context for graceful shutdown
+                ctx, cancel := context.WithCancel(context.Background())
+                defer cancel()
+
+                // Setup signal handling for graceful shutdown
+                sigCh := make(chan os.Signal, 1)
+                signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+
+                // Start server in a goroutine
+                go func() </span><span class="cov0" title="0">{
+                        log.Info().Msg("Press Ctrl+C to stop the server")
+                        if err := server.ListenAndServe(addr); err != nil </span><span class="cov0" title="0">{
+                                // FastHTTP не має константи ErrServerClosed, тому просто логуємо помилку
+                                log.Error().Err(err).Msg("Server stopped")
+                                cancel() // Cancel context on server error
+                        }</span>
+                }()
+
+                // Wait for termination signal
+                <span class="cov0" title="0">select </span>{
+                        case &lt;-sigCh:<span class="cov0" title="0">
+                                log.Info().Msg("Shutdown signal received, stopping server...")</span>
+                        case &lt;-ctx.Done():<span class="cov0" title="0">
+                                log.Info().Msg("Server stopped due to error")</span>
+                }
+
+                // Shutdown with timeout
+                <span class="cov0" title="0">shutdownTimeout := 5 * time.Second
+                log.Info().Msgf("Gracefully shutting down server (timeout: %s)...", shutdownTimeout)
+
+                // Create shutdown context with timeout
+                shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), shutdownTimeout)
+                defer shutdownCancel()
+
+                // Shutdown the server
+                if err := server.ShutdownWithContext(shutdownCtx); err != nil </span><span class="cov0" title="0">{
+                        log.Error().Err(err).Msg("Error during server shutdown")
+                }</span> else<span class="cov0" title="0"> {
+                        log.Info().Msg("Server gracefully stopped")
+                }</span>
+        },
+}
+
+func init() <span class="cov0" title="0">{
+        rootCmd.AddCommand(serverCmd)
+        serverCmd.Flags().StringVar(&amp;serverHost, "host", "127.0.0.1", "Host address to bind the server to")
+        serverCmd.Flags().IntVar(&amp;serverPort, "port", 8080, "Port to run the server on")
+}</span>
+</pre>
+		
+		<pre class="file" id="file3" style="display: none">/*
+Copyright © 2025 NAME HERE &lt;EMAIL ADDRESS&gt;
+*/
+package main
+
+import (
+        "github.com/obezsmertnyi/k8s-custom-controller/cmd"
+        "github.com/rs/zerolog/log"
+)
+
+func main() <span class="cov0" title="0">{
+        if err := cmd.Execute(); err != nil </span><span class="cov0" title="0">{
+                log.Error().Err(err).Msg("CLI execution failed")
+        }</span>
+}
+</pre>
+		
+		<pre class="file" id="file4" style="display: none">package tests
+
+import (
+        "github.com/obezsmertnyi/k8s-custom-controller/cmd"
+        "time"
+)
+
+// MockConfig creates a mock configuration for testing
+func MockConfig() *cmd.Config <span class="cov8" title="1">{
+        config := &amp;cmd.Config{}
+        
+        // Set default values
+        config.Kubernetes.Timeout = 30 * time.Second
+        config.Kubernetes.QPS = 50
+        config.Kubernetes.Burst = 100
+        config.Kubernetes.Namespace = "default"
+        config.Logging.Level = "info"
+        config.Logging.Format = "text"
+        
+        return config
+}</span>
+
+// MockConfigWithEnv creates a mock configuration with environment variable values
+func MockConfigWithEnv() *cmd.Config <span class="cov8" title="1">{
+        config := MockConfig()
+        config.Kubernetes.Namespace = "test-namespace"
+        config.Logging.Level = "debug"
+        config.Logging.Format = "json"
+        return config
+}</span>
+
+// MockConfigWithFile creates a mock configuration with file values
+func MockConfigWithFile() *cmd.Config <span class="cov8" title="1">{
+        config := MockConfig()
+        config.Kubernetes.Namespace = "file-namespace"
+        config.Kubernetes.QPS = 100
+        config.Kubernetes.Burst = 200
+        config.Logging.Level = "trace"
+        config.Logging.Format = "json"
+        return config
+}</span>
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>

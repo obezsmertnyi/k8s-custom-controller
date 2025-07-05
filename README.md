@@ -23,14 +23,15 @@ The application includes a high-performance FastHTTP server with the following f
 - Request logging with detailed metrics
 - Sensible timeout defaults for production use
 - 10MB maximum request size limit for security
+- Graceful shutdown with signal handling
 
 **Usage:**
 ```sh
-# Start server on localhost:8080 (default)
+# Start server on all interfaces (default)
 ./k8s-cli server
 
-# Start server on all interfaces with custom port
-./k8s-cli server --host 0.0.0.0 --port 8090
+# Start server with custom port
+./k8s-cli server --port 8090
 
 # Start with debug logging
 ./k8s-cli server --log-level debug
@@ -66,21 +67,64 @@ The logging system is centralized and configured at application startup. All com
   - `config.go` — Configuration management with Viper
   - `server.go` — FastHTTP server implementation with graceful shutdown
 - `main.go` — Entry point for the application
-- `scripts/` — Test and utility scripts
 - `tests/` — Test files
+  - `server_test.go` — Tests for server functionality
+  - `logging_test.go` — Tests for logging configuration
+- `Makefile` — Build automation tasks
+- `Dockerfile` — Distroless Dockerfile for secure containerization
+- `.github/workflows/` — GitHub Actions workflows for CI/CD
+- `charts/app` — Helm chart for Kubernetes deployment
 
-## Testing
+## Development
+
+### Building the Application
 
 ```sh
+# Build the binary
+make build
+
+# Clean build artifacts
+make clean
+
+# Run linters
+make lint
+
 # Run all tests
-go test ./...
+make test
 
-# Run specific test files
-go test ./tests/server_test.go
-
-# Manual configuration testing
-./scripts/test-config.sh
+# Generate test coverage report
+make coverage
 ```
+
+### Docker Support
+
+```sh
+# Build Docker image
+make docker-build
+
+# Run in Docker container
+make docker-run
+```
+
+### Testing Specific Components
+
+```sh
+# Test server component
+make test-server
+
+# Test logging component
+make test-logging
+```
+
+## CI/CD Pipeline
+
+The project includes a GitHub Actions workflow that automatically:
+
+1. Builds and tests the application
+2. Creates a Docker image using a secure distroless base
+3. Scans the image for vulnerabilities using Trivy
+4. Publishes the image to GitHub Container Registry
+5. Packages the Helm chart for Kubernetes deployment
 
 ## License
 
