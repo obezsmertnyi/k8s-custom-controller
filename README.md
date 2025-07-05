@@ -73,7 +73,7 @@ The logging system is centralized and configured at application startup. All com
 - `Makefile` — Build automation tasks
 - `Dockerfile` — Distroless Dockerfile for secure containerization
 - `.github/workflows/` — GitHub Actions workflows for CI/CD
-- `charts/app` — Helm chart for Kubernetes deployment
+- `charts/k8s-custom-controller` — Helm chart for Kubernetes deployment
 
 ## Development
 
