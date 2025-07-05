@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/obezsmertnyi/k8s-custom-controller/pkg/informer"
@@ -49,6 +50,33 @@ func StartComponents(config *Config) error {
 	}
 	log.Info().Msg("Successfully connected to Kubernetes cluster")
 
+	// Create shared informer factory
+	informerOpts := config.ToInformerOptions()
+	var factory informers.SharedInformerFactory
+
+	// Create informer factory with options
+	factoryOptions := []informers.SharedInformerOption{}
+
+	// Set namespace if specified
+	if config.Informer.Namespace != "" {
+		log.Debug().Str("namespace", config.Informer.Namespace).Msg("Limiting informer to namespace")
+		factoryOptions = append(factoryOptions, informers.WithNamespace(config.Informer.Namespace))
+	}
+
+	// Create the factory
+	factory = informers.NewSharedInformerFactoryWithOptions(
+		clientset,
+		informerOpts.ResyncPeriod,
+		factoryOptions...,
+	)
+
+	// Start informer factory if informer is enabled
+	if !config.Kubernetes.DisableInformer {
+		// Start all requested informers
+		log.Info().Msg("Starting shared informer factory")
+		factory.Start(ctx.Done())
+	}
+
 	// Start components
 	wg := sync.WaitGroup{}
 
@@ -60,7 +88,7 @@ func StartComponents(config *Config) error {
 		go func() {
 			defer wg.Done()
 			log.Info().Msg("Starting API server...")
-			if err := StartAPIServer(ctx, clientset, host, port); err != nil {
+			if err := StartAPIServer(ctx, clientset, factory, host, port); err != nil {
 				log.Error().Err(err).Msg("Error running API server")
 			}
 		}()

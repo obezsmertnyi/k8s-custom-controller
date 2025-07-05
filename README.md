@@ -94,10 +94,30 @@ All Kubernetes commands support the `--kubeconfig` flag to specify a custom Kube
 The application includes a high-performance FastHTTP API server with the following features:
 
 - Configurable host and port settings via command-line flags
-- Request logging with detailed metrics
+- Kubernetes informer cache integration for efficient resource queries
+- Request logging with unique request IDs and structured metrics
+- Multiple resource endpoints (deployments, pods, services, nodes)
+- Support for simple and detailed JSON response formats
 - Sensible timeout defaults for production use
 - 10MB maximum request size limit for security
 - Graceful shutdown with signal handling
+
+#### API Endpoints
+
+The server provides the following REST API endpoints:
+
+```
+GET /health          - Server health check
+GET /deployments     - List Kubernetes deployments (uses informer cache)
+GET /pods            - List Kubernetes pods
+GET /services        - List Kubernetes services
+GET /nodes           - List Kubernetes nodes
+```
+
+All resource endpoints support the following query parameters:
+
+- `namespace` - Filter resources by namespace (not applicable to nodes)
+- `format=simple` - Return a simple JSON array of resource names instead of detailed information
 - Can be disabled via configuration
 
 **Usage:**
