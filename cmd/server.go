@@ -102,6 +102,6 @@ Example:
 
 func init() {
 	rootCmd.AddCommand(serverCmd)
-	serverCmd.Flags().StringVar(&serverHost, "host", "127.0.0.1", "Host address to bind the server to")
+	serverCmd.Flags().StringVar(&serverHost, "host", "0.0.0.0", "Host address to bind the server to")
 	serverCmd.Flags().IntVar(&serverPort, "port", 8080, "Port to run the server on")
 }
