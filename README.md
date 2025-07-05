@@ -15,6 +15,56 @@ The application uses Viper for flexible configuration management with the follow
 
 If no configuration file is found, the application will use default values and environment variables, and a warning message will be logged.
 
+### Kubernetes CLI Commands
+
+The application includes a set of commands for managing Kubernetes deployments:
+
+#### List Deployments
+
+List all deployments in a namespace with detailed information.
+
+```sh
+# List deployments in default namespace
+./k8s-cli list
+
+# List deployments in specific namespace
+./k8s-cli list --namespace kube-system
+
+# Use custom kubeconfig file
+./k8s-cli list --kubeconfig /path/to/kubeconfig
+```
+
+#### Create Deployment
+
+Create a new Kubernetes deployment with configurable parameters.
+
+```sh
+# Create a basic deployment
+./k8s-cli create --name my-app --image nginx:latest
+
+# Create with custom settings
+./k8s-cli create \
+  --name my-app \
+  --image nginx:latest \
+  --replicas 3 \
+  --port 80 \
+  --namespace my-namespace
+```
+
+#### Delete Deployment
+
+Delete a deployment from a namespace.
+
+```sh
+# Delete a deployment from default namespace
+./k8s-cli delete my-app
+
+# Delete from specific namespace
+./k8s-cli delete my-app --namespace my-namespace
+```
+
+All Kubernetes commands support the `--kubeconfig` flag to specify a custom Kubernetes configuration file. If not provided, the default path (`~/.kube/config`) will be used.
+
 ### FastHTTP Server Command
 
 The application includes a high-performance FastHTTP server with the following features:
@@ -66,6 +116,7 @@ The logging system is centralized and configured at application startup. All com
   - `root.go` — Root command and centralized logger configuration
   - `config.go` — Configuration management with Viper
   - `server.go` — FastHTTP server implementation with graceful shutdown
+  - `kubernetes.go` — Kubernetes CLI commands (list, create, delete) with shared helpers
 - `main.go` — Entry point for the application
 - `tests/` — Test files
   - `server_test.go` — Tests for server functionality
