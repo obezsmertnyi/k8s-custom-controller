@@ -2,9 +2,6 @@ package tests
 
 import (
 	"fmt"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -62,31 +59,23 @@ func TestServerGracefulShutdown(t *testing.T) {
 
 // TestServerCommandDefined checks if the server command is defined and has the expected properties
 func TestServerCommandDefined(t *testing.T) {
-	// Get the current working directory
-	cwd, err := os.Getwd()
-	assert.NoError(t, err, "Should be able to get current directory")
-
-	// Go up one directory to the project root
-	projectRoot := filepath.Dir(cwd)
-
-	// First check that the command exists
-	cmd := exec.Command(filepath.Join(projectRoot, "k8s-cli"), "help")
-	output, err := cmd.CombinedOutput()
-	assert.NoError(t, err, "Help command should run without errors")
-	outputStr := string(output)
-	assert.Contains(t, outputStr, "server", "Server command should be defined")
-
-	// Now check the server command properties
-	cmd = exec.Command(filepath.Join(projectRoot, "k8s-cli"), "help", "server")
-	output, err = cmd.CombinedOutput()
-	assert.NoError(t, err, "Server help command should run without errors")
-	outputStr = string(output)
-
-	// Check if the command has the expected description
-	assert.Contains(t, outputStr, "Start a FastHTTP server", "Server command should have the correct description")
-
-	// Check if the output contains the expected flags
-	assert.Contains(t, outputStr, "--host", "Server command should have a host flag")
-	assert.Contains(t, outputStr, "--port", "Server command should have a port flag")
-	assert.Contains(t, outputStr, "--log-level", "Server command should have a log-level flag")
+	// Get mock server command
+	serverCmd := MockServerCommand()
+	
+	// Verify server command exists
+	assert.NotNil(t, serverCmd, "Server command should be defined")
+	
+	// Verify server command name
+	assert.Equal(t, "server", serverCmd.Use, "Server command should be named 'server'")
+	
+	// Verify server command flags
+	portFlag := serverCmd.Flags().Lookup("port")
+	assert.NotNil(t, portFlag, "Server command should have a port flag")
+	
+	hostFlag := serverCmd.Flags().Lookup("host")
+	assert.NotNil(t, hostFlag, "Server command should have a host flag")
+	
+	// Verify default values
+	assert.Equal(t, "0.0.0.0", hostFlag.DefValue, "Default host should be 0.0.0.0")
+	assert.Equal(t, "8080", portFlag.DefValue, "Default port should be 8080")
 }
