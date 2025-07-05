@@ -1,0 +1,23 @@
+kubernetes:
+  kubeconfig: /home/obezsmertnyi/.kube/config
+  in_cluster: false
+  qps: 10.0
+  burst: 20
+  timeout: 20s
+  disable_informer: false
+  disable_api: false
+
+informer:
+  namespace: custom-namespace
+  resync_period: 2m
+  label_selector: environment=development
+  field_selector: metadata.name=important-deployment
+  logging:
+    enable_event_logging: true
+    log_level: debug
+  workers:
+    count: 4
+
+logging:
+  level: debug
+  format: json

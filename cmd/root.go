@@ -8,11 +8,17 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+
+	"github.com/obezsmertnyi/k8s-custom-controller/pkg/informer"
 )
 
 var (
-	logLevel string
-	cfgFile  string
+	logLevel   string
+	cfgFile    string
+	serverPort int
+	serverHost string
+	// kubeconfig объявлена в kubernetes.go
 )
 
 var rootCmd = &cobra.Command{
@@ -36,18 +42,11 @@ Supports configuration via config files, command-line flags, and environment var
 		level := parseLogLevel(config.Logging.Level)
 		configureLogger(level, config.Logging.Format)
 
-		// Demonstration of different logging levels
-		log.Info().Msg("This is an info log")
-		log.Debug().Msg("This is a debug log")
-		log.Trace().Msg("This is a trace log")
-		log.Warn().Msg("This is a warn log")
-		log.Error().Msg("This is an error log")
-
-		// Display configuration information
-		log.Info().Str("namespace", config.Kubernetes.Namespace).Msg("Using Kubernetes namespace")
-		log.Info().Bool("in_cluster", config.Kubernetes.InCluster).Msg("Kubernetes client mode")
-
-		fmt.Println("Welcome to k8s-custom-controller CLI!")
+		// Start all components (API server and informer)
+		if err := StartComponents(config); err != nil {
+			log.Error().Err(err).Msg("Failed to start components")
+			return
+		}
 	},
 }
 
@@ -121,6 +120,7 @@ func setupLogging() {
 }
 
 func Execute() error {
+	// Initial logging setup to display errors during configuration loading
 	setupLogging()
 
 	config, err := LoadConfig()
@@ -129,14 +129,35 @@ func Execute() error {
 		return err
 	}
 
+	// Apply log level settings from configuration
 	level := parseLogLevel(config.Logging.Level)
-	configureLogger(level, config.Logging.Format)
+	
+	// Determine log format considering priority order
+	logFormat := config.Logging.Format
+	if envFormat := os.Getenv("KCUSTOM_LOGGING_FORMAT"); envFormat != "" {
+		// Environment variable has priority over configuration from file
+		logFormat = envFormat
+		log.Debug().Str("format", envFormat).Msg("Using log format from environment variable")
+	}
+
+	// Configure logging with correct priority order
+	configureLogger(level, logFormat)
 
 	return rootCmd.Execute()
 }
 
 func init() {
+	// Add persistent flags for root command
 	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", "info", "Set log level: trace, debug, info, warn, error")
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "Config file path (default is $HOME/.k8s-custom-controller/config.yaml)")
+	rootCmd.PersistentFlags().StringVar(&kubeconfig, "kubeconfig", getDefaultKubeconfig(), "Path to the kubeconfig file (default: ~/.kube/config)")
+
+	// Add flags for API server
+	rootCmd.Flags().StringVar(&serverHost, "host", "0.0.0.0", "Host address to bind the server to")
+	rootCmd.Flags().IntVar(&serverPort, "port", 8080, "Port to run the server on")
+
 	rootCmd.AddCommand(ConfigCmd())
+
+	// Setup informer defaults in Viper
+	informer.SetupInformerDefaults(viper.GetViper())
 }

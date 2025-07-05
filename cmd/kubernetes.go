@@ -15,9 +15,9 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-// Common variables
+// Common variables - accessible at package level
 var (
-	kubeconfig string
+	kubeconfig string // Used by both root and kubernetes commands
 	namespace  string
 )
 
@@ -216,6 +216,7 @@ func logDeploymentAction(action, name, ns, img string, replicas, p int32) {
 }
 
 // getDefaultKubeconfig returns the default kubeconfig path
+// Exported at package level to be used by both root and kubernetes commands
 func getDefaultKubeconfig() string {
 	home, err := os.UserHomeDir()
 	if err != nil {

@@ -1,8 +1,16 @@
 # k8s-cli
 
-A Kubernetes custom controller and CLI tool with advanced configuration management and API server capabilities.
+A Kubernetes custom controller and CLI tool with advanced configuration management, deployment informer, and API server capabilities.
 
 ## Features
+
+### Integrated Architecture
+
+The application integrates multiple components into a single binary:
+
+- **Kubernetes Deployment Informer**: Watches for changes in Kubernetes deployments
+- **FastHTTP API Server**: Provides HTTP API access to informer data
+- **CLI Commands**: For direct interaction with Kubernetes resources
 
 ### Configuration Management with Viper
 
@@ -13,7 +21,23 @@ The application uses Viper for flexible configuration management with the follow
 3. Configuration file
 4. Default values
 
-If no configuration file is found, the application will use default values and environment variables, and a warning message will be logged.
+If a configuration file is explicitly specified with `--config` but not found, the application will exit with an error. If no explicit config file is provided and no default config is found, the application will use default values and environment variables with just a warning message.
+
+#### Configuration File Locations
+
+The application looks for a configuration file named `config.yaml` in these locations:
+
+- Current directory (`./config.yaml`)
+- User's home directory (`$HOME/.k8s-custom-controller/config.yaml`)
+- System configuration directory (`/etc/k8s-custom-controller/config.yaml`)
+
+You can specify a custom path with the `--config` flag:
+
+```sh
+./k8s-cli --config /path/to/my-config.yaml
+```
+
+A sample configuration file is provided in the root of the project. See [Configuration Example](#configuration-example) for details.
 
 ### Kubernetes CLI Commands
 
@@ -65,26 +89,45 @@ Delete a deployment from a namespace.
 
 All Kubernetes commands support the `--kubeconfig` flag to specify a custom Kubernetes configuration file. If not provided, the default path (`~/.kube/config`) will be used.
 
-### FastHTTP Server Command
+### Integrated FastHTTP API Server
 
-The application includes a high-performance FastHTTP server with the following features:
+The application includes a high-performance FastHTTP API server with the following features:
 
-- Configurable host and port settings
+- Configurable host and port settings via command-line flags
 - Request logging with detailed metrics
 - Sensible timeout defaults for production use
 - 10MB maximum request size limit for security
 - Graceful shutdown with signal handling
+- Can be disabled via configuration
 
 **Usage:**
 ```sh
-# Start server on all interfaces (default)
-./k8s-cli server
+# Start with default API server on port 8080
+./k8s-cli
 
-# Start server with custom port
-./k8s-cli server --port 8090
+# Start with custom API server port
+./k8s-cli --port 8090
 
-# Start with debug logging
-./k8s-cli server --log-level debug
+# Start with custom host binding
+./k8s-cli --host 127.0.0.1
+
+# Disable API server via config
+# (In config file, set: kubernetes.disable_api: true)
+```
+
+### Deployment Informer
+
+The application includes a Kubernetes deployment informer that:
+
+- Watches for deployment changes (create, update, delete events)
+- Caches deployment information for fast API responses
+- Configurable resync period and label/field selectors
+- Can be disabled via configuration
+
+**Available API Endpoints:**
+```
+GET /health        # Health check endpoint
+GET /deployments   # List all cached deployments
 ```
 
 ### Log Level Support
@@ -98,6 +141,52 @@ The application supports different log levels using `zerolog`:
 ./k8s-cli --log-level info   # Default level (if not specified)
 ./k8s-cli --log-level warn   # Warning conditions
 ./k8s-cli --log-level error  # Error conditions
+```
+
+## Configuration Example
+
+Below is an example of a complete configuration file (`config.yaml`):
+
+```yaml
+kubernetes:
+  # Path to kubeconfig file, leave empty for in-cluster config
+  kubeconfig: ~/.kube/config
+  # Whether to use in-cluster configuration
+  in_cluster: false
+  # API server queries per second
+  qps: 10.0
+  # Maximum burst for throttle
+  burst: 20
+  # Timeout for API server requests
+  timeout: 20s
+  # Disable informer component if set to true
+  disable_informer: false
+  # Disable API server component if set to true
+  disable_api: false
+
+informer:
+  # Namespace to watch, leave empty for all namespaces
+  namespace: default
+  # Resync period for informer cache
+  resync_period: 1m
+  # Label selector for filtering deployments
+  label_selector: ""
+  # Field selector for filtering deployments
+  field_selector: ""
+  logging:
+    # Whether to log informer events
+    enable_event_logging: true
+    # Log level for informer (trace, debug, info, warn, error)
+    log_level: info
+  workers:
+    # Number of worker goroutines
+    count: 2
+
+logging:
+  # Global log level (trace, debug, info, warn, error)
+  level: info
+  # Log format (json, text)
+  format: text
 ```
 
 Log format is configured in the configuration file or via environment variables:
