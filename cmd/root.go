@@ -112,7 +112,26 @@ func configureLogger(level zerolog.Level, format string) {
 	}
 }
 
+func setupLogging() {
+	logFormat := "text"
+	if envFormat := os.Getenv("KCUSTOM_LOGGING_FORMAT"); envFormat != "" {
+		logFormat = envFormat
+	}
+	configureLogger(parseLogLevel("info"), logFormat)
+}
+
 func Execute() error {
+	setupLogging()
+
+	config, err := LoadConfig()
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to load configuration")
+		return err
+	}
+
+	level := parseLogLevel(config.Logging.Level)
+	configureLogger(level, config.Logging.Format)
+
 	return rootCmd.Execute()
 }
 

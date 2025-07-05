@@ -40,18 +40,6 @@ func homeDir() string {
 	return ""
 }
 
-// ResetConfig resets Viper state for tests
-func ResetConfig() {
-	viper.Reset()
-	// Clear global cfgFile variable
-	cfgFile = ""
-}
-
-// SetTestConfig sets configuration for tests
-func SetTestConfig(config *Config) {
-	// This function is used only in tests
-}
-
 // LoadConfig loads configuration from file and environment variables
 // Exported function for use in tests and other packages
 func LoadConfig() (*Config, error) {
@@ -107,7 +95,7 @@ func LoadConfig() (*Config, error) {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
 			return nil, fmt.Errorf("error reading config file: %v", err)
 		}
-		log.Info().Msg("No config file found, using defaults and environment variables")
+		log.Warn().Msg("No config file found, using defaults and environment variables")
 	}
 
 	// Bind environment variables to configuration

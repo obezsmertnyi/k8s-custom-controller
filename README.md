@@ -1,6 +1,6 @@
-# k8s-custom-controller
+# k8s-cli
 
-A Kubernetes custom controller and CLI tool with advanced configuration management.
+A Kubernetes custom controller and CLI tool with advanced configuration management and API server capabilities.
 
 ## Features
 
@@ -9,67 +9,31 @@ A Kubernetes custom controller and CLI tool with advanced configuration manageme
 The application uses Viper for flexible configuration management with the following priority order:
 
 1. Command-line flags
-2. Environment variables
+2. Environment variables (with `KCUSTOM_` prefix)
 3. Configuration file
 4. Default values
 
-#### Configuration Options
+If no configuration file is found, the application will use default values and environment variables, and a warning message will be logged.
 
-**Command-line flags:**
+### FastHTTP Server Command
+
+The application includes a high-performance FastHTTP server with the following features:
+
+- Configurable host and port settings
+- Request logging with detailed metrics
+- Sensible timeout defaults for production use
+- 10MB maximum request size limit for security
+
+**Usage:**
 ```sh
-# Set log level
-./k8s-cli --log-level debug
+# Start server on localhost:8080 (default)
+./k8s-cli server
 
-# Specify custom config file
-./k8s-cli --config /path/to/config.yaml
+# Start server on all interfaces with custom port
+./k8s-cli server --host 0.0.0.0 --port 8090
 
-# Set Kubernetes namespace
-./k8s-cli --namespace my-namespace
-```
-
-**Environment variables:**
-All configuration options can be set using environment variables with the `KCUSTOM_` prefix:
-```sh
-# Set Kubernetes namespace
-export KCUSTOM_KUBERNETES_NAMESPACE=test-namespace
-
-# Set log level
-export KCUSTOM_LOGGING_LEVEL=debug
-
-# Set log format
-export KCUSTOM_LOGGING_FORMAT=json
-
-# Set Kubernetes QPS and burst
-export KCUSTOM_KUBERNETES_QPS=100
-export KCUSTOM_KUBERNETES_BURST=200
-
-# Run the application
-./k8s-cli
-```
-
-**Configuration file:**
-The application looks for a `config.yaml` file in the following locations:
-- Current directory
-- `$HOME/.k8s-custom-controller/`
-- `/etc/k8s-custom-controller/`
-
-Example configuration file:
-```yaml
-kubernetes:
-  kubeconfig: ~/.kube/config
-  namespace: default
-  in_cluster: false
-  timeout: 30s
-  qps: 50
-  burst: 100
-logging:
-  level: info
-  format: text
-```
-
-**View current configuration:**
-```sh
-./k8s-cli config view
+# Start with debug logging
+./k8s-cli server --log-level debug
 ```
 
 ### Log Level Support
@@ -78,73 +42,46 @@ The application supports different log levels using `zerolog`:
 
 ```sh
 # Available log levels
-./k8s-cli --log-level trace  # Most verbose, includes all logs
+./k8s-cli --log-level trace  # Most verbose
 ./k8s-cli --log-level debug  # Detailed debugging information
-./k8s-cli --log-level info   # Default level, general operational information
+./k8s-cli --log-level info   # Default level (if not specified)
 ./k8s-cli --log-level warn   # Warning conditions
 ./k8s-cli --log-level error  # Error conditions
 ```
 
-Log level can also be set via configuration file or environment variable:
-```sh
-export KCUSTOM_LOGGING_LEVEL=debug
-```
-
-### Log Format
-
-Two log formats are supported:
-- `text` (default): Human-readable format with colors and formatting
-- `json`: Structured JSON format for machine processing
-
-Set the format in the configuration file:
-```yaml
-logging:
-  format: json
-```
-
-Or via environment variable:
-```sh
-export KCUSTOM_LOGGING_FORMAT=json
-```
-
-## Testing
-
-### Configuration Tests
-
-The project includes tests for configuration management:
+Log format is configured in the configuration file or via environment variables:
 
 ```sh
-# Run configuration tests
-go test ./tests
+# Set log format via environment variable
+export KCUSTOM_LOGGING_FORMAT=json  # For JSON format
+export KCUSTOM_LOGGING_FORMAT=text  # For human-readable format (default)
 ```
 
-These tests verify:
-- Default configuration values
-- Environment variable overrides
-- Configuration file loading
-
-### Manual Configuration Testing
-
-A test script is provided to manually test configuration loading from different sources:
-
-```sh
-# Run the configuration test script
-./scripts/test-config.sh
-```
-
-This script tests:
-1. Default configuration
-2. Configuration from environment variables
-3. Configuration from config file
-4. Configuration from command line flags
+The logging system is centralized and configured at application startup. All components respect the global logging configuration, including the log level and format settings.
 
 ## Project Structure
 
-- `cmd/` — Contains your CLI commands and configuration management
-  - `root.go` — Root command and logger configuration
+- `cmd/` — Contains CLI commands and configuration management
+  - `root.go` — Root command and centralized logger configuration
   - `config.go` — Configuration management with Viper
-- `main.go` — Entry point for your application
+  - `server.go` — FastHTTP server implementation with graceful shutdown
+- `main.go` — Entry point for the application
+- `scripts/` — Test and utility scripts
+- `tests/` — Test files
+
+## Testing
+
+```sh
+# Run all tests
+go test ./...
+
+# Run specific test files
+go test ./tests/server_test.go
+
+# Manual configuration testing
+./scripts/test-config.sh
+```
 
 ## License
 
-MIT License. See [LICENSE](LICENSE) for details. 
+MIT License. See [LICENSE](LICENSE) for details.
