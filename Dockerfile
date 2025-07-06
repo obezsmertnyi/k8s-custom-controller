@@ -12,4 +12,4 @@ FROM gcr.io/distroless/static-debian12
 WORKDIR /
 COPY --from=builder /app/k8s-cli .
 EXPOSE 8080
-ENTRYPOINT ["/k8s-cli", "server"]
+ENTRYPOINT ["/k8s-cli"]

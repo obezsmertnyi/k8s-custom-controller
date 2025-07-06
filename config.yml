@@ -1,0 +1,54 @@
+kubernetes:
+  kubeconfig: ~/.kube/config
+  in_cluster: false
+  qps: 10.0
+  burst: 20
+  timeout: 20s
+
+# API server settings
+api_server:
+  enabled: true  # Enable API server component
+  host: "0.0.0.0"
+  port: 8080
+  enable_swagger: true  # Enable Swagger documentation
+  security:
+    rate_limit_requests_per_second: 10  # Rate limit requests per second
+    max_connections_per_ip: 100  # Maximum connections per IP
+    idle_timeout_seconds: 120  # Idle connection timeout
+    read_timeout_seconds: 10  # Read timeout
+    write_timeout_seconds: 30  # Write timeout
+    disable_keepalive: false  # Disable keepalive in production
+  swagger_ui:
+    enabled: true  # Enable Swagger UI, not just JSON docs
+    cors_enabled: true  # Enable CORS headers for Swagger UI
+    cors_allow_origin: "*"  # Allow all origins (change to specific domains in production)
+    cors_allow_methods: "GET, POST, PUT, DELETE, OPTIONS"  # HTTP methods to allow
+    cors_allow_headers: "Content-Type, Authorization"  # Headers to allow
+    cors_max_age: 3600  # Preflight cache time in seconds
+    use_strict_csp: false  # Use strict Content Security Policy
+
+informer:
+  enabled: true  # Enable informer component
+  namespace: custom-namespace  # Namespace to watch, leave empty for all namespaces
+  resync_period: 2m  # How often to resync the informer cache
+  label_selector: environment=production  # Filter resources by label
+  field_selector: metadata.name=important-deployment  # Filter resources by field
+  logging:
+    enable_event_logging: true  # Log Kubernetes events
+    log_level: info  # Log level for informer component
+  workers:
+    count: 4  # Number of worker goroutines for processing events
+
+# Controller-runtime settings
+controller_runtime:
+  leader_election:
+    enabled: true  # Enable leader election for controller high availability
+    id: "k8s-custom-controller"  # Leader election ID
+    namespace: "kube-system"  # Namespace for leader election
+  metrics:
+    bind_address: ":8081"  # Address to expose metrics on
+
+# Logging configuration
+logging:
+  format: json  # Log format (json or console)
+  level: info  # Global log level (debug, info, warn, error)

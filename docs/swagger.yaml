@@ -1,0 +1,129 @@
+basePath: /
+info:
+  contact: {}
+  description: API server for managing and monitoring Kubernetes resources across
+    multiple clusters
+  title: Kubernetes Multi-Cluster Controller API
+  version: "1.0"
+paths:
+  /clusters:
+    get:
+      description: Returns information about connected Kubernetes clusters
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get Kubernetes clusters information
+      tags:
+      - kubernetes
+      - clusters
+  /deployments:
+    get:
+      description: Returns list of Kubernetes deployments across all connected clusters
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get Kubernetes deployments
+      tags:
+      - kubernetes
+      - deployments
+  /health:
+    get:
+      description: Returns health status of the API server and Kubernetes connection
+        state
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get API server health status
+      tags:
+      - system
+  /nodes:
+    get:
+      description: Returns list of Kubernetes nodes across all connected clusters
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get Kubernetes nodes
+      tags:
+      - kubernetes
+      - nodes
+  /pods:
+    get:
+      description: Returns list of Kubernetes pods across all connected clusters
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get Kubernetes pods
+      tags:
+      - kubernetes
+      - pods
+  /services:
+    get:
+      description: Returns list of Kubernetes services across all connected clusters
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get Kubernetes services
+      tags:
+      - kubernetes
+      - services
+swagger: "2.0"

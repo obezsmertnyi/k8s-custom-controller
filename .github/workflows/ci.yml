@@ -1,4 +1,4 @@
-name: CI
+name: k8s-custom-controller CI/CD
 
 on:
   push:
@@ -22,6 +22,16 @@ on:
       - 'pkg/**'
       - '.github/workflows/ci.yml'
 
+env:
+  GO_VERSION: '1.24.4'
+  BINARY_NAME: 'k8s-cli'
+  IMAGE_NAME: 'k8s-custom-controller'
+  HELM_CHART_NAME: 'k8s-custom-controller'
+
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -30,7 +40,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24.2'
+          go-version: ${{ env.GO_VERSION }}
       - name: Set version
         id: vars
         run: |
@@ -57,21 +67,26 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ github.actor }}
+          username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Docker image
-        run: docker build -t ghcr.io/${{ github.repository }}/app:${{ steps.vars.outputs.docker_tag }} .
+        run: docker build -t ghcr.io/${{ github.repository }}/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.docker_tag }} .
       - name: Trivy Scan
         uses: aquasecurity/trivy-action@0.28.0
         with:
-          image-ref: ghcr.io/${{ github.repository }}/app:${{ steps.vars.outputs.docker_tag }}
-      - name: Push Docker image
-        run: docker push ghcr.io/${{ github.repository }}/app:${{ steps.vars.outputs.docker_tag }}
+          image-ref: ghcr.io/${{ github.repository }}/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.docker_tag }}
+      - name: Tag Docker image with latest
+        run: docker tag ghcr.io/${{ github.repository }}/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.docker_tag }} ghcr.io/${{ github.repository }}/${{ env.IMAGE_NAME }}:latest
+
+      - name: Push Docker images
+        run: |
+          docker push ghcr.io/${{ github.repository }}/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.docker_tag }}
+          docker push ghcr.io/${{ github.repository }}/${{ env.IMAGE_NAME }}:latest
       - name: Package Helm chart
         run: |
-          helm package charts/app --version ${{ steps.vars.outputs.version }} --app-version ${{ steps.vars.outputs.app_version }}
+          helm package charts/${{ env.HELM_CHART_NAME }} --version ${{ steps.vars.outputs.version }} --app-version ${{ steps.vars.outputs.app_version }}
           mkdir -p chart-artifacts
-          mv app-${{ steps.vars.outputs.version }}.tgz chart-artifacts/
+          mv ${{ env.HELM_CHART_NAME }}-${{ steps.vars.outputs.version }}.tgz chart-artifacts/
       - name: Upload Helm chart artifact
         uses: actions/upload-artifact@v4
         with:

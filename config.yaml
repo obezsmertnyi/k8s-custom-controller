@@ -1,0 +1,39 @@
+kubernetes:
+  # Path to kubeconfig file, leave empty for in-cluster config
+  kubeconfig: ~/.kube/config
+  # Whether to use in-cluster configuration
+  in_cluster: false
+  # API server queries per second
+  qps: 10.0
+  # Maximum burst for throttle
+  burst: 20
+  # Timeout for API server requests
+  timeout: 20s
+  # Disable informer component if set to true
+  disable_informer: false
+  # Disable API server component if set to true
+  disable_api: false
+
+informer:
+  # Namespace to watch, leave empty for all namespaces
+  namespace: default
+  # Resync period for informer cache
+  resync_period: 1m
+  # Label selector for filtering deployments
+  label_selector: ""
+  # Field selector for filtering deployments
+  field_selector: ""
+  logging:
+    # Whether to log informer events
+    enable_event_logging: true
+    # Log level for informer (trace, debug, info, warn, error)
+    log_level: info
+  workers:
+    # Number of worker goroutines
+    count: 2
+
+logging:
+  # Global log level (trace, debug, info, warn, error)
+  level: info
+  # Log format (json, text)
+  format: text
