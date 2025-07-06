@@ -44,6 +44,16 @@ type ClusterConfig struct {
 	Namespace   string // Namespace to watch (empty for all)
 	ClusterID   string // Unique ID for this cluster
 	APIEndpoint string // API server endpoint
+	
+	// Leader election settings
+	LeaderElection struct {
+		Enabled   bool   // Enable leader election
+		Namespace string // Namespace for leader election resources
+		ID        string // Unique ID for leader election
+	}
+	
+	// Metrics settings
+	MetricsBindAddress string // Address for metrics server, empty to disable
 }
 
 // MultiClusterManager manages controllers for multiple Kubernetes clusters
@@ -118,10 +128,15 @@ func NewManager(cfg ClusterConfig) (manager.Manager, error) {
 	// Create manager options
 	options := ctrl.Options{
 		Scheme: Scheme(),
-		// Assign a unique ID to the manager
-		LeaderElection:          false,
-		LeaderElectionNamespace: "default",
-		LeaderElectionID:        fmt.Sprintf("k8s-custom-controller-%s", cfg.ClusterID),
+		// Leader election settings
+		LeaderElection:          cfg.LeaderElection.Enabled,
+		LeaderElectionNamespace: cfg.LeaderElection.Namespace,
+		LeaderElectionID:        cfg.LeaderElection.ID,
+	}
+	
+	// Add metrics server if configured
+	if cfg.MetricsBindAddress != "" {
+		options.Metrics.BindAddress = cfg.MetricsBindAddress
 	}
 
 	// Apply namespace filter if specified

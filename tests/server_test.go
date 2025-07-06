@@ -57,25 +57,29 @@ func TestServerGracefulShutdown(t *testing.T) {
 	assert.NoError(t, err, "Server should shutdown gracefully")
 }
 
-// TestServerCommandDefined checks if the server command is defined and has the expected properties
-func TestServerCommandDefined(t *testing.T) {
-	// Get mock server command
-	serverCmd := MockServerCommand()
+// TestCliServerFlags checks if the k8s-cli command has the expected server-related flags and properties
+func TestCliServerFlags(t *testing.T) {
+	// Get mock CLI command
+	cliCmd := MockCliCommand()
 	
-	// Verify server command exists
-	assert.NotNil(t, serverCmd, "Server command should be defined")
+	// Verify CLI command exists
+	assert.NotNil(t, cliCmd, "CLI command should be defined")
 	
-	// Verify server command name
-	assert.Equal(t, "server", serverCmd.Use, "Server command should be named 'server'")
+	// Verify CLI command name
+	assert.Equal(t, "k8s-cli", cliCmd.Use, "CLI command should be named 'k8s-cli'")
 	
-	// Verify server command flags
-	portFlag := serverCmd.Flags().Lookup("port")
-	assert.NotNil(t, portFlag, "Server command should have a port flag")
+	// Verify server-related flags
+	portFlag := cliCmd.Flags().Lookup("port")
+	assert.NotNil(t, portFlag, "CLI command should have a port flag")
 	
-	hostFlag := serverCmd.Flags().Lookup("host")
-	assert.NotNil(t, hostFlag, "Server command should have a host flag")
+	hostFlag := cliCmd.Flags().Lookup("host")
+	assert.NotNil(t, hostFlag, "CLI command should have a host flag")
+	
+	swaggerFlag := cliCmd.Flags().Lookup("enable-swagger")
+	assert.NotNil(t, swaggerFlag, "CLI command should have an enable-swagger flag")
 	
 	// Verify default values
 	assert.Equal(t, "0.0.0.0", hostFlag.DefValue, "Default host should be 0.0.0.0")
 	assert.Equal(t, "8080", portFlag.DefValue, "Default port should be 8080")
+	assert.Equal(t, "true", swaggerFlag.DefValue, "Default Swagger UI state should be enabled")
 }

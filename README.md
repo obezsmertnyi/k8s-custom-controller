@@ -1,369 +1,63 @@
-# k8s-cli
+# Kubernetes Custom Controller
+
+[![CI Status](https://github.com/obezsmertnyi/k8s-custom-controller/workflows/CI/badge.svg)](https://github.com/obezsmertnyi/k8s-custom-controller/actions)
+[![Release](https://img.shields.io/github/v/release/obezsmertnyi/k8s-custom-controller)](https://github.com/obezsmertnyi/k8s-custom-controller/releases)
+[![Docker](https://img.shields.io/badge/docker-ghcr.io%2Fobezsmertnyi%2Fk8s--custom--controller-blue)](https://github.com/obezsmertnyi/k8s-custom-controller/pkgs/container/k8s-custom-controller/k8s-custom-controller)
+[![Go Version](https://img.shields.io/badge/go-1.24.4-blue.svg)](https://golang.org/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
+A powerful Kubernetes management tool built with [Cobra CLI](https://github.com/spf13/cobra), [client-go](https://github.com/kubernetes/client-go), and [controller-runtime](https://github.com/kubernetes-sigs/controller-runtime), providing advanced deployment management and real-time event monitoring capabilities.
+
+## 📑 Table of Contents
+
+- [✨ Features](#-features)
+- [🚀 Quick Start](#-quick-start)
+- [⚙️ Configuration](#%EF%B8%8F-configuration)
+- [🌐 API Server](#-api-server)
+- [🎮 Controller Runtime](#-controller-runtime)
+- [🐳 Docker Support](#-docker-support)
+- [🎯 CLI Commands](#-cli-commands)
+- [📁 Project Structure](#-project-structure)
+- [🔥 Future Development](#-future-development)
+- [📜 License](#-license)
+
+## ✨ Features
+
+- **📋 Multi-Cluster Management**: Monitor deployments across multiple Kubernetes clusters simultaneously
+- **👁️ Real-time Informer**: Watch deployment changes with live event logging
+- **🎯 Controller-Runtime Integration**: Advanced controller with detailed event logging
+- **🌐 FastHTTP API Server**: Fast HTTP API with Swagger UI for programmatic access
+- **🔐 Flexible Authentication**: Kubeconfig and in-cluster authentication support
+- **🚀 Powerful CLI**: Clean, intuitive command interface
+- **🧪 Comprehensive Testing**: Integration with real Kubernetes API via EnvTest
+- **⚙️ Advanced Configuration**: Layered configuration system with environment variables
+
+## 🚀 Quick Start
+
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/obezsmertnyi/k8s-custom-controller.git
+cd k8s-custom-controller
 
-A Kubernetes custom controller and CLI tool with advanced configuration management, multi-cluster deployment controller, and API server capabilities.
-
-## Features
-
-### Integrated Architecture
-
-The application integrates multiple components into a single binary:
-
-- **Multi-Cluster Deployment Controller**: Monitors deployments across multiple Kubernetes clusters simultaneously
-- **Kubernetes Deployment Informer**: Watches for changes in Kubernetes deployments
-- **FastHTTP API Server**: Provides HTTP API access to cluster data and controllers
-- **CLI Commands**: For direct interaction with Kubernetes resources
-
-### Configuration Management with Viper
-
-The application uses Viper for flexible configuration management with the following priority order:
-
-1. Command-line flags
-2. Environment variables (with `KCUSTOM_` prefix)
-3. Configuration file
-4. Default values
-
-If a configuration file is explicitly specified with `--config` but not found, the application will exit with an error. If no explicit config file is provided and no default config is found, the application will use default values and environment variables with just a warning message.
-
-#### Configuration File Locations
-
-The application looks for a configuration file named `config.yaml` in these locations:
-
-- Current directory (`./config.yaml`)
-- User's home directory (`$HOME/.k8s-custom-controller/config.yaml`)
-- System configuration directory (`/etc/k8s-custom-controller/config.yaml`)
-
-You can specify a custom path with the `--config` flag:
-
-```sh
-./k8s-cli --config /path/to/my-config.yaml
-```
-
-A sample configuration file is provided in the root of the project. See [Configuration Example](#configuration-example) for details.
-
-### Kubernetes CLI Commands
-
-The application includes a set of commands for managing Kubernetes deployments:
-
-#### List Deployments
-
-List all deployments in a namespace with detailed information.
-
-```sh
-# List deployments in default namespace
-./k8s-cli list
-
-# List deployments in specific namespace
-./k8s-cli list --namespace kube-system
-
-# Use custom kubeconfig file
-./k8s-cli list --kubeconfig /path/to/kubeconfig
-```
-
-#### Create Deployment
-
-Create a new Kubernetes deployment with configurable parameters.
-
-```sh
-# Create a basic deployment
-./k8s-cli create --name my-app --image nginx:latest
-
-# Create with custom settings
-./k8s-cli create \
-  --name my-app \
-  --image nginx:latest \
-  --replicas 3 \
-  --port 80 \
-  --namespace my-namespace
-```
-
-#### Delete Deployment
-
-Delete a deployment from a namespace.
-
-```sh
-# Delete a deployment from default namespace
-./k8s-cli delete my-app
-
-# Delete from specific namespace
-./k8s-cli delete my-app --namespace my-namespace
-```
-
-All Kubernetes commands support the `--kubeconfig` flag to specify a custom Kubernetes configuration file. If not provided, the default path (`~/.kube/config`) will be used.
-
-### Integrated FastHTTP API Server
-
-The application includes a high-performance FastHTTP API server with the following features:
-
-- Configurable host and port settings via command-line flags
-- Kubernetes informer cache integration for efficient resource queries
-- Request logging with unique request IDs and structured metrics
-- Multiple resource endpoints (deployments, pods, services, nodes)
-- Support for simple and detailed JSON response formats
-- Sensible timeout defaults for production use
-- 10MB maximum request size limit for security
-- Graceful shutdown with signal handling
-
-#### API Endpoints
-
-The server provides the following REST API endpoints:
-
-```
-GET /health          - Server health check
-GET /deployments     - List Kubernetes deployments (uses informer cache)
-GET /pods            - List Kubernetes pods
-GET /services        - List Kubernetes services
-GET /nodes           - List Kubernetes nodes
-```
-
-All resource endpoints support the following query parameters:
-
-- `namespace` - Filter resources by namespace (not applicable to nodes)
-- `format=simple` - Return a simple JSON array of resource names instead of detailed information
-- Can be disabled via configuration
-
-**Usage:**
-```sh
-# Start with default API server on port 8080
-./k8s-cli
-
-# Start with custom API server port
-./k8s-cli --port 8090
-
-# Start with custom host binding
-./k8s-cli --host 127.0.0.1
-
-# Disable API server via config
-# (In config file, set: kubernetes.disable_api: true)
-```
-
-### Deployment Informer
-
-The application includes a Kubernetes deployment informer that:
-
-- Watches for deployment changes (create, update, delete events)
-- Caches deployment information for fast API responses
-- Configurable resync period and label/field selectors
-- Can be disabled via configuration
-
-**Available API Endpoints:**
-```
-GET /health        # Health check endpoint
-GET /deployments   # List all cached deployments
-```
-
-### Log Level Support
-
-The application supports different log levels using `zerolog`:
-
-```sh
-# Available log levels
-./k8s-cli --log-level trace  # Most verbose
-./k8s-cli --log-level debug  # Detailed debugging information
-./k8s-cli --log-level info   # Default level (if not specified)
-./k8s-cli --log-level warn   # Warning conditions
-./k8s-cli --log-level error  # Error conditions
-```
-
-## Multi-Cluster Controller
-
-The application includes a production-ready multi-cluster deployment controller that can monitor multiple Kubernetes clusters simultaneously.
-
-### Features
-
-- **Dynamic Cluster Management**: Add and remove clusters at runtime without restart
-- **Structured Event Logging**: Detailed logging of all deployment events with unique IDs
-- **Automatic Reconciliation**: Monitors deployments across all managed clusters
-- **Concurrent Processing**: Each cluster controller runs independently
-- **API Integration**: REST API endpoints for cluster management
-
-### API Endpoints
-
-#### List Managed Clusters
-
-```sh
-curl http://localhost:8080/clusters
-```
-
-Response:
-```json
-{
-  "count": 2,
-  "clusters": {
-    "prod-cluster": {
-      "name": "Production",
-      "cluster_id": "prod-cluster",
-      "kubeconfig": "/path/to/kubeconfig",
-      "context": "production-context",
-      "namespace": "default"
-    },
-    "staging-cluster": {
-      "name": "Staging",
-      "cluster_id": "staging-cluster",
-      "in_cluster": true,
-      "namespace": "default"
-    }
-  }
-}
-```
-
-#### Add a New Cluster
-
-```sh
-curl -X POST http://localhost:8080/clusters \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "production",
-    "cluster_id": "prod-cluster",
-    "kubeconfig": "/path/to/kubeconfig",
-    "context": "production-context",
-    "namespace": "default"
-  }'
-```
-
-Configuration Options:
-- `name`: Human-readable name for the cluster
-- `cluster_id`: Unique identifier for the cluster (used in logs)
-- `kubeconfig`: Path to kubeconfig file (omit for in-cluster config)
-- `context`: Kubernetes context name (optional)
-- `in_cluster`: Boolean, set to true when running inside the cluster
-- `namespace`: Namespace to watch (optional, defaults to all namespaces)
-
-#### Remove a Cluster
-
-```sh
-curl -X DELETE "http://localhost:8080/clusters?id=prod-cluster"
-```
-
-### Logging and Monitoring
-
-The controller logs all deployment events with structured data including:
-- Event ID (UUID)
-- Cluster ID
-- Event type (CREATE, UPDATE, DELETE)
-- Resource information (namespace, name)
-- Replica counts (including old and new values for updates)
-
-Example log entry:
-```
-{"level":"info","event_id":"6ba7b810-9dad-11d1-80b4-00c04fd430c8","cluster_id":"prod-cluster","event_type":"UPDATE","resource_type":"Deployment","namespace":"default","name":"nginx","old_replicas":1,"new_replicas":3,"time":"2025-07-05T10:45:32Z","message":"Deployment replicas changed"}
-```
-
-### How to Test
-
-To verify the multi-cluster controller is working correctly:
-
-1. Start the server component:
-   ```sh
-   ./k8s-cli server --log-level debug
-   ```
-
-2. Add an additional cluster via API:
-   ```sh
-   curl -X POST http://localhost:8080/clusters -H "Content-Type: application/json" -d '{
-     "name": "second-cluster",
-     "cluster_id": "cluster-2",
-     "kubeconfig": "path/to/second-kubeconfig"
-   }'
-   ```
-
-3. Create or update deployments in either cluster and observe the logs showing events from both clusters with their respective cluster_id values.
-
-## Configuration Example
-
-Below is an example of a complete configuration file (`config.yaml`):
-
-```yaml
-kubernetes:
-  # Path to kubeconfig file, leave empty for in-cluster config
-  kubeconfig: ~/.kube/config
-  # Whether to use in-cluster configuration
-  in_cluster: false
-  # API server queries per second
-  qps: 10.0
-  # Maximum burst for throttle
-  burst: 20
-  # Timeout for API server requests
-  timeout: 20s
-  # Disable informer component if set to true
-  disable_informer: false
-  # Disable API server component if set to true
-  disable_api: false
-
-informer:
-  # Namespace to watch, leave empty for all namespaces
-  namespace: default
-  # Resync period for informer cache
-  resync_period: 1m
-  # Label selector for filtering deployments
-  label_selector: ""
-  # Field selector for filtering deployments
-  field_selector: ""
-  logging:
-    # Whether to log informer events
-    enable_event_logging: true
-    # Log level for informer (trace, debug, info, warn, error)
-    log_level: info
-  workers:
-    # Number of worker goroutines
-    count: 2
-
-logging:
-  # Global log level (trace, debug, info, warn, error)
-  level: info
-  # Log format (json, text)
-  format: text
-```
-
-Log format is configured in the configuration file or via environment variables:
-
-```sh
-# Set log format via environment variable
-export KCUSTOM_LOGGING_FORMAT=json  # For JSON format
-export KCUSTOM_LOGGING_FORMAT=text  # For human-readable format (default)
-```
-
-The logging system is centralized and configured at application startup. All components respect the global logging configuration, including the log level and format settings.
-
-## Project Structure
-
-- `cmd/` — Contains CLI commands and configuration management
-  - `root.go` — Root command and centralized logger configuration
-  - `config.go` — Configuration management with Viper
-  - `server.go` — FastHTTP server implementation with graceful shutdown
-  - `kubernetes.go` — Kubernetes CLI commands (list, create, delete) with shared helpers
-- `main.go` — Entry point for the application
-- `tests/` — Test files
-  - `server_test.go` — Tests for server functionality
-  - `logging_test.go` — Tests for logging configuration
-- `Makefile` — Build automation tasks
-- `Dockerfile` — Distroless Dockerfile for secure containerization
-- `.github/workflows/` — GitHub Actions workflows for CI/CD
-- `charts/app` — Helm chart for Kubernetes deployment
-
-## Development
-
-### Building the Application
-
-```sh
 # Build the binary
 make build
-
-# Clean build artifacts
-make clean
-
-# Run linters
-make lint
-
-# Run all tests
-make test
-
-# Generate test coverage report
-make coverage
 ```
 
-### Docker Support
+### Docker Usage
 
-```sh
+```bash
+# Pull the pre-built image
+docker pull ghcr.io/obezsmertnyi/k8s-custom-controller/k8s-custom-controller:latest
+
+# Run with mounted kubeconfig and configuration file
+docker run --rm --network host \
+    -v ~/.kube/config:/root/.kube/config \
+    -v ./docs/config-example.yaml:/app/config.yaml \
+    ghcr.io/obezsmertnyi/k8s-custom-controller/k8s-custom-controller:latest \
+    --config=/app/config.yaml
+
 # Build Docker image
 make docker-build
 
@@ -371,26 +65,417 @@ make docker-build
 make docker-run
 ```
 
-### Testing Specific Components
+### Basic Commands
 
-```sh
-# Test server component
-make test-server
+```bash
+# Start with default configuration
+./k8s-cli
 
-# Test logging component
-make test-logging
+# List available commands
+./k8s-cli --help
+
+# Start with a specific config file
+./k8s-cli --config=./config.yaml
+
+# Run with command-line options
+./k8s-cli --port=8090 --enable-swagger=false
+
+# List deployments in a namespace
+./k8s-cli list --namespace default
+
+```
+## 📁 Project Structure
+
+```
+.
+├── charts/                 # Helm charts for Kubernetes deployment
+├── cmd/                   # CLI commands and application entrypoints
+├── config/                # Kubernetes resources for deployment
+├── docs/                  # Documentation and examples
+├── pkg/                   # Core functionality packages
+│   ├── ctrl/              # Controller-runtime implementation
+│   ├── informer/          # Kubernetes informer implementation
+│   └── testutil/          # Testing utilities
+├── scripts/               # Helper scripts for development
+└── tests/                 # Integration tests
 ```
 
-## CI/CD Pipeline
+## ⚙️ Configuration
 
-The project includes a GitHub Actions workflow that automatically:
+The application uses a flexible, layered configuration system based on [Viper](https://github.com/spf13/viper).
 
-1. Builds and tests the application
-2. Creates a Docker image using a secure distroless base
-3. Scans the image for vulnerabilities using Trivy
-4. Publishes the image to GitHub Container Registry
-5. Packages the Helm chart for Kubernetes deployment
+### Configuration Example
 
-## License
+Below is a complete production-ready configuration example:
 
-MIT License. See [LICENSE](LICENSE) for details.
+```yaml
+# Kubernetes connection settings
+kubernetes:
+  kubeconfig: ~/.kube/config  # Path to kubeconfig file
+  in_cluster: false  # Set to true when running inside Kubernetes cluster
+  context: "my-context"  # Kubernetes context to use
+  namespace: "default"  # Default namespace
+  qps: 10.0  # API server QPS limit
+  burst: 20  # API server burst limit
+  timeout: 20s  # API server timeout
+
+# API server settings
+api_server:
+  enabled: true  # Enable API server component
+  host: "0.0.0.0"  # Listen address
+  port: 8080  # Listen port
+  enable_swagger: true  # Enable Swagger documentation
+  security:
+    rate_limit_requests_per_second: 10  # Rate limit requests per second
+    max_connections_per_ip: 100  # Maximum connections per IP
+    idle_timeout_seconds: 120  # Idle connection timeout
+    read_timeout_seconds: 10  # Read timeout
+    write_timeout_seconds: 30  # Write timeout
+    disable_keepalive: false  # Disable keepalive in production
+
+# Informer settings
+informer:
+  enabled: true  # Enable informer component
+  namespace: ""  # Namespace to watch, leave empty for all namespaces
+  resync_period: 2m  # How often to resync the informer cache
+  label_selector: ""  # Filter resources by label
+  field_selector: ""  # Filter resources by field
+
+# Controller-runtime settings
+controller_runtime:
+  leader_election:
+    enabled: true  # Enable leader election for controller high availability
+    id: "k8s-custom-controller"  # Leader election ID
+    namespace: "kube-system"  # Namespace for leader election
+  metrics:
+    bind_address: ":8081"  # Address to expose metrics on
+
+# Logging configuration
+logging:
+  format: json  # Log format (json or console)
+  level: info  # Global log level (debug, info, warn, error)
+  time_format: rfc3339  # Time format for logs
+  output: stdout  # Log output destination
+```
+
+## 🎯 CLI Commands
+
+The `k8s-cli` provides a set of powerful commands to manage Kubernetes resources:
+
+```bash
+Commands:
+  config      Manage configuration
+  create      Create a Kubernetes deployment in the specified namespace
+  delete      Delete a Kubernetes deployment in the specified namespace
+  help        Help about any command
+  list        List Kubernetes deployments in the specified namespace
+
+Flags:
+      --config string                      Config file path (default is $HOME/.k8s-custom-controller/config.yaml)
+      --enable-leader-election             Enable leader election for controller manager (default true)
+      --enable-swagger                     Enable Swagger UI documentation (default true)
+  -h, --help                               help for k8s-cli
+      --host string                        Host address to bind the server to (default "0.0.0.0")
+      --kubeconfig string                  Path to the kubeconfig file (default: ~/.kube/config) 
+      --leader-election-id string          ID for leader election (default "k8s-custom-controller-leader-election")
+      --leader-election-namespace string   Namespace for leader election resources (default "default")
+      --log-level string                   Set log level: trace, debug, info, warn, error (default "info")
+      --metrics-bind-address string        Bind address for metrics server (default "0.0.0.0")
+      --metrics-port int                   Port for controller manager metrics (default 8081)
+      --port int                           Port to run the server on (default 8080)
+```
+
+### Examples
+
+```bash
+# List all deployments in the default namespace
+./k8s-cli list
+
+# Create a new deployment
+./k8s-cli create --name nginx-app --image nginx:1.21 --replicas 3 --namespace production
+
+# Delete a deployment
+./k8s-cli delete nginx-app --namespace production
+
+# View configuration
+./k8s-cli config view
+```
+
+### Configuration Layers
+
+```mermaid
+flowchart TD
+    A[Command-line flags] -->|Highest Priority| E[Final Configuration]
+    B[Environment Variables] -->|KCUSTOM_ prefix| E
+    C[Configuration YAML file] --> E
+    D[Default Values] -->|Lowest Priority| E
+```
+
+### Architecture Overview
+
+```mermaid
+flowchart TB
+    CLI[Command Line Interface] --> Config[Configuration Manager]
+    Config --> K8sClient[Kubernetes Client]
+    Config --> APIServer[API Server]
+    Config --> Informer[Resource Informer]
+    Config --> Runtime[Controller Runtime]
+    
+    K8sClient --> Informer
+    K8sClient --> Runtime
+    
+    APIServer --> Swagger[Swagger UI]
+    APIServer --> HealthAPI[Health Endpoint]
+    APIServer --> ResourceAPI[Resource Endpoints]
+    
+    Informer --> EventHandlers[Event Handlers]
+    Runtime --> Controllers[Custom Controllers]
+    
+    subgraph "External Integrations"
+      ResourceAPI --> MultiCluster[Multi-Cluster Manager]
+    end
+```
+
+### Component Diagram
+
+```mermaid
+flowchart LR
+    User([User]) --> |Uses| CLI
+    CLI[k8s-cli] --> |Configures| Server[FastHTTP Server]
+    CLI --> |Initializes| K8s[Kubernetes Client]
+    CLI --> |Manages| CR[Controller Runtime]
+    CLI --> |Watches| Informers[Resource Informers]
+    Server --> |Provides| API[JSON API]
+    Server --> |Exposes| Swagger[Swagger UI]
+    K8s --> |Access| Clusters[(Kubernetes Clusters)]
+    Informers --> |Monitor| Resources[(Kubernetes Resources)]
+    CR --> |Reconciles| CRDs[(Custom Resources)]
+```
+
+### Configuration Priority
+
+The configuration system prioritizes values in the following order (highest to lowest):
+
+1. Command-line flags (e.g., `--port`, `--host`, `--enable-swagger`)
+2. Environment variables (with `KCUSTOM_` prefix)
+3. Configuration file (YAML/JSON)
+4. Default values
+
+### Configuration File
+
+The application searches for a configuration file in these locations:
+
+1. Path specified with `--config` flag
+2. `./config.yaml` in current directory
+3. `$HOME/.k8s-custom-controller/config.yaml`
+4. `/etc/k8s-custom-controller/config.yaml`
+
+### Environment Variables
+
+The tool supports setting any config value via environment variables with the `KCUSTOM_` prefix. Example:
+
+```bash
+# Logging configuration
+KCUSTOM_LOGGING_FORMAT=json
+KCUSTOM_LOGGING_LEVEL=debug
+```
+
+## 🌐 API Server
+
+The application exposes a REST API server using the [FastHTTP](https://github.com/valyala/fasthttp) framework for optimal performance. When enabled, it provides access to Kubernetes resources through a JSON API.
+
+### Key Features
+
+- **FastHTTP Engine**: High-performance HTTP server optimized for low latency
+- **Swagger UI Integration**: Interactive API documentation and testing
+- **JSON API**: Standardized JSON responses for all endpoints
+- **Rate Limiting**: Configurable per-IP and global rate limiting
+- **Security Headers**: Modern security headers for protection
+
+### Starting the API Server
+
+#### Enable via Configuration File
+
+```yaml
+api_server:
+  enabled: true
+  host: "0.0.0.0"
+  port: 8080
+  enable_swagger: true
+```
+### Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Health check for API server |
+| `/clusters` | GET | List registered clusters |
+| `/deployments` | GET | List deployments across clusters |
+| `/pods` | GET | List pods across clusters |
+| `/services` | GET | List services across clusters |
+| `/nodes` | GET | List nodes across clusters |
+| `/swagger` | GET | Swagger UI interface |
+
+## 🎮 Controller Runtime
+
+The application integrates with [controller-runtime](https://github.com/kubernetes-sigs/controller-runtime) to provide advanced Kubernetes resource handling and events monitoring.
+
+### Key Features
+
+- **Leader Election**: Ensure only one controller is active in clustered deployments
+- **Metrics Server**: Prometheus-compatible metrics endpoint
+- **Event Broadcasting**: Standardized event handling and recording
+- **Resource Watching**: Efficient resource change monitoring
+
+### Configuration
+
+```yaml
+controller_runtime:
+  leader_election:
+    enabled: true
+    id: k8s-custom-controller-leader-election
+    namespace: default
+  metrics:
+    bind_address: :8081
+```
+
+### Architecture
+
+```mermaid
+flowchart LR
+    A[Controller Manager] --> B[Reconciler]
+    B --> C[Kubernetes API]
+    B --> D[Caching Layer]
+    D --> C
+    B --> E[Events]
+    E --> C
+```
+
+### Features
+
+- **Automatic Reconciliation**: Handles CREATE, UPDATE, DELETE events
+- **Rate Limiting**: Configurable reconciliation rate
+- **Leader Election**: Optional for high-availability deployments
+- **Metrics**: Prometheus metrics for reconciliations, errors, and latencies
+- **Event Recording**: Kubernetes events for controller actions
+
+## 🐳 Docker Support
+
+The application provides comprehensive Docker support for containerized deployments.
+
+### Pre-built Images
+
+```bash
+# Pull latest image
+docker pull ghcr.io/obezsmertnyi/k8s-custom-controller/k8s-custom-controller:latest
+
+# Run with mounted kubeconfig
+docker run --rm --network host \
+    -v ~/.kube/config:/root/.kube/config \
+    -v ./docs/config-example.yaml:/app/config.yaml \
+    ghcr.io/obezsmertnyi/k8s-custom-controller/k8s-custom-controller:latest \
+    --config=/app/config.yaml
+```
+
+### Building Custom Images
+
+```bash
+# Build image
+make docker-build
+
+# Build and tag for registry
+make docker-tag
+
+# Build and run
+make docker-run
+```
+
+### Kubernetes Deployment
+
+Helm chart is available in the `charts/` directory:
+
+```bash
+helm install k8s-controller ./charts/k8s-custom-controller \
+    --set kubeconfig.enabled=false \
+    --set incluster.enabled=true
+```
+
+### Roadmap Status
+
+<table class="roadmap" style="background-color: #1e1e2e; color: white; width: 100%; border-collapse: collapse;">
+  <thead>
+    <tr style="border-bottom: 1px solid #444;">
+      <th style="padding: 10px; text-align: center;">Step</th>
+      <th style="padding: 10px; text-align: left;">Feature</th>
+      <th style="padding: 10px; text-align: center;">Status</th>
+      <th style="padding: 10px; text-align: center;">Target Date</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr style="border-bottom: 1px solid #333;">
+      <td style="padding: 10px; text-align: center;">Step 11</td>
+      <td style="padding: 10px; text-align: left;">Custom CRD and Multi-Project Support</td>
+      <td style="padding: 10px; text-align: center;">☑ In Progress</td>
+      <td style="padding: 10px; text-align: center;">Q3 2025</td>
+    </tr>
+    <tr style="border-bottom: 1px solid #333;">
+      <td style="padding: 10px; text-align: center;">Step 12</td>
+      <td style="padding: 10px; text-align: left;">Platform Engineering Integration</td>
+      <td style="padding: 10px; text-align: center;">☐ Planned</td>
+      <td style="padding: 10px; text-align: center;">Q3 2025</td>
+    </tr>
+    <tr style="border-bottom: 1px solid #333;">
+      <td style="padding: 10px; text-align: center;">Step 13</td>
+      <td style="padding: 10px; text-align: left;">MCP Server Integration</td>
+      <td style="padding: 10px; text-align: center;">☐ Planned</td>
+      <td style="padding: 10px; text-align: center;">Q3 2025</td>
+    </tr>
+    <tr style="border-bottom: 1px solid #333;">
+      <td style="padding: 10px; text-align: center;">Step 14</td>
+      <td style="padding: 10px; text-align: left;">JWT Authentication</td>
+      <td style="padding: 10px; text-align: center;">☐ Backlog</td>
+      <td style="padding: 10px; text-align: center;">Q3 2025</td>
+    </tr>
+    <tr>
+      <td style="padding: 10px; text-align: center;">Step 15</td>
+      <td style="padding: 10px; text-align: left;">Testing and Observability</td>
+      <td style="padding: 10px; text-align: center;">☐ Backlog</td>
+      <td style="padding: 10px; text-align: center;">Q4 2025</td>
+    </tr>
+  </tbody>
+</table>
+
+### Current Development
+
+#### Step 11: Custom CRD and Multi-Project Support
+- [x] Initial CRD definition created
+- [ ] Custom CRD `Frontendpage` with dedicated informer
+- [ ] Controller with additional reconciliation logic for custom resource
+- [ ] Multi-project client configuration for management clusters
+
+#### Step 12: Platform Engineering Integration
+- [ ] Integration with [Port.io](https://docs.port.io/actions-and-automations/create-self-service-experiences/setup-the-backend)
+- [ ] API handler for actions to CRUD custom resources
+- [ ] Discord notifications integration
+- [ ] Add update action support for IDP and controller
+
+#### Step 13: MCP Server Integration
+- [ ] Integrate with [github.com/mark3labs/mcp-go/mcp](https://github.com/mark3labs/mcp-go/mcp) to create MCP server
+- [ ] API handlers as MCP tools with configurable port
+- [ ] Add delete/update MCP tools
+- [ ] Add OIDC authentication to MCP
+
+#### Step 14: JWT Authentication
+- [ ] JWT authentication and authorization for API
+- [ ] JWT authentication and authorization for MCP
+- [ ] Role-based access control for all endpoints
+
+#### Step 15: Testing and Observability
+- [ ] Basic OpenTelemetry code instrumentation
+- [ ] Achieve 90% test coverage
+- [ ] End-to-end testing of all components
+
+## 📜 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+Copyright (c) 2025 Oleksandr Bezsmertnyi

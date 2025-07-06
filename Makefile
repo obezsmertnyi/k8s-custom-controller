@@ -36,6 +36,19 @@ docker-build:
 	docker build --build-arg VERSION=$(VERSION) -t $(APP):latest .
 	@echo "$(GREEN)✅ Docker build complete$(NC)"
 
+docker-tag: docker-build
+	@echo "$(BLUE)🔖 Tagging Docker image...$(NC)"
+	docker tag $(APP):latest ghcr.io/obezsmertnyi/k8s-custom-controller:$(VERSION)
+	@echo "$(GREEN)✅ Docker tag complete$(NC)"
+
+docker-run: docker-build
+	@echo "$(BLUE)🚀 Running Docker container...$(NC)"
+	docker run --rm --network host \
+		-v $(HOME)/.kube/config:/root/.kube/config \
+		-v $(PWD)/docs/config-example.yaml:/app/config.yaml \
+		$(APP):latest --config=/app/config.yaml
+	@echo "$(GREEN)✅ Docker run complete$(NC)"
+
 clean:
 	@echo "$(YELLOW)🧹 Cleaning...$(NC)"
 	rm -rf bin/
@@ -61,10 +74,6 @@ test-logging: build
 	@echo "$(BLUE)🧪 Testing logging component...$(NC)"
 	go test -v ./tests/logging_test.go
 	@echo "$(GREEN)✅ Logging tests complete$(NC)"
-
-docker-run: docker-build
-	@echo "$(BLUE)🚀 Running Docker container...$(NC)"
-	docker run --rm -p 8080:8080 $(APP):latest
 
 help:
 	@echo "$(BLUE)📚 Available commands:$(NC)"

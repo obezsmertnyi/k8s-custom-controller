@@ -80,11 +80,25 @@ func StartComponents(config *Config) error {
 	// Start components
 	wg := sync.WaitGroup{}
 
-	// Start API server if not disabled
-	if !config.Kubernetes.DisableAPI {
+	// Start API server if enabled (either via new config or legacy config)
+	if (config.APIServer.Enabled || config.APIServer.Enabled == false && !config.Kubernetes.DisableAPI) {
 		wg.Add(1)
-		host := serverHost
-		port := serverPort
+		// Use command-line args if provided, otherwise use config values
+		host := config.APIServer.Host
+		port := config.APIServer.Port
+		
+		// Override with command line flags if specified
+		if serverHost != "" {
+			host = serverHost
+			log.Debug().Str("host", host).Msg("Using API server host from command line")
+		}
+		
+		// Override with command line flag if explicitly set (not using the default 8080)
+		if serverPort != 8080 { // 8080 is the default value set in init()
+			port = serverPort
+			log.Debug().Int("port", port).Msg("Using API server port from command line")
+		}
+		
 		go func() {
 			defer wg.Done()
 			log.Info().Msg("Starting API server...")
@@ -96,8 +110,8 @@ func StartComponents(config *Config) error {
 		log.Info().Msg("API server is disabled via configuration")
 	}
 
-	// Start informer if not disabled
-	if !config.Kubernetes.DisableInformer {
+	// Start informer if enabled (either via new config or legacy config)
+	if (config.Informer.Enabled || config.Informer.Enabled == false && !config.Kubernetes.DisableInformer) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
