@@ -41,12 +41,16 @@ func TestDeploymentReconciler_BasicFlow(t *testing.T) {
 	// Create a logger but don't use it directly in this test
 	_ = zerolog.New(os.Stdout)
 
+	// Create a separate context for the goroutine to prevent race conditions
+	managerCtx := ctx
+	
 	// Start the mock manager in a goroutine
 	go func() {
-		_ = mockManager.Start(ctx)
+		_ = mockManager.Start(managerCtx)
 	}()
 
 	ns := "default"
+	// Create a new context for the test's main thread
 	ctx = context.Background()
 	name := "test-deployment"
 
