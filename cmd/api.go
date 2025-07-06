@@ -14,6 +14,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/obezsmertnyi/k8s-custom-controller/pkg/ctrl"
 	"github.com/obezsmertnyi/k8s-custom-controller/pkg/informer"
 )
 
@@ -21,6 +22,8 @@ import (
 type apiServer struct {
 	clientset *kubernetes.Clientset
 	informerFactory informers.SharedInformerFactory
+	// Multi-cluster deployment controller manager
+	multiClusterManager *ctrl.MultiClusterManager
 }
 
 // requestHandler processes HTTP requests with logging
@@ -47,6 +50,8 @@ func (s *apiServer) requestHandler(ctx *fasthttp.RequestCtx) {
 	switch {
 	case string(ctx.Path()) == "/health":
 		s.handleHealth(ctx)
+	case string(ctx.Path()) == "/clusters":
+		s.handleClusters(ctx)
 	case string(ctx.Path()) == "/deployments":
 		s.handleDeployments(ctx)
 	case string(ctx.Path()) == "/pods":
@@ -456,39 +461,179 @@ func isSimpleFormat(ctx *fasthttp.RequestCtx) bool {
 	return string(ctx.QueryArgs().Peek("format")) == "simple"
 }
 
-// Starts FastHTTP API server
-func StartAPIServer(ctx context.Context, clientset *kubernetes.Clientset, factory informers.SharedInformerFactory, host string, port int) error {
-	addr := fmt.Sprintf("%s:%d", host, port)
-	server := &apiServer{
-		clientset:      clientset,
-		informerFactory: factory,
+// handleClusters handles requests to /clusters endpoint for multi-cluster management
+func (s *apiServer) handleClusters(ctx *fasthttp.RequestCtx) {
+	logger := getRequestLogger(ctx)
+	method := string(ctx.Method())
+	logger.Debug().Str("method", method).Msg("Processing clusters request")
+	
+	switch method {
+	case "GET":
+		// Get list of configured clusters
+		clusterCount := s.multiClusterManager.GetClusterCount()
+		
+		// Create response object
+		clustersList := s.multiClusterManager.GetClusters()
+		// Convert slice to map
+		clustersMap := make(map[string]ctrl.ClusterConfig)
+		for _, cfg := range clustersList {
+			clustersMap[cfg.ClusterID] = cfg
+		}
+		
+		response := struct {
+			Count    int                        `json:"count"`
+			Clusters map[string]ctrl.ClusterConfig `json:"clusters"`
+		}{
+			Count:    clusterCount,
+			Clusters: clustersMap,
+		}
+		
+		jsonResponse, err := json.Marshal(response)
+		if err != nil {
+			logger.Error().Err(err).Msg("Failed to marshal clusters response")
+			ctx.SetStatusCode(fasthttp.StatusInternalServerError)
+			ctx.SetBodyString(`{"error": "Internal server error"}`)
+			return
+		}
+		
+		ctx.SetStatusCode(fasthttp.StatusOK)
+		ctx.SetBody(jsonResponse)
+		logger.Debug().Int("cluster_count", clusterCount).Msg("Returned cluster list")
+		
+	case "POST":
+		// Add a new cluster
+		var clusterConfig ctrl.ClusterConfig
+		if err := json.Unmarshal(ctx.PostBody(), &clusterConfig); err != nil {
+			logger.Error().Err(err).Msg("Invalid cluster configuration JSON")
+			ctx.SetStatusCode(fasthttp.StatusBadRequest)
+			ctx.SetBodyString(`{"error": "Invalid cluster configuration format"}`)
+			return
+		}
+		
+		// Validate required fields
+		if clusterConfig.ClusterID == "" {
+			logger.Error().Msg("Missing required cluster_id field")
+			ctx.SetStatusCode(fasthttp.StatusBadRequest)
+			ctx.SetBodyString(`{"error": "Missing required cluster_id field"}`)
+			return
+		}
+		
+		// Add the cluster to the manager
+		if err := s.multiClusterManager.AddCluster(ctx, clusterConfig); err != nil {
+			logger.Error().Err(err).Str("cluster_id", clusterConfig.ClusterID).Msg("Failed to add cluster")
+			ctx.SetStatusCode(fasthttp.StatusInternalServerError)
+			ctx.SetBodyString(fmt.Sprintf(`{"error": "Failed to add cluster: %s"}`, err.Error()))
+			return
+		}
+		
+		logger.Info().Str("cluster_id", clusterConfig.ClusterID).Msg("Added new cluster to manager")
+		ctx.SetStatusCode(fasthttp.StatusCreated)
+		ctx.SetBodyString(fmt.Sprintf(`{"message": "Cluster %s added successfully"}`, clusterConfig.ClusterID))
+		
+	case "DELETE":
+		// Get cluster ID from query parameters
+		clusterID := string(ctx.QueryArgs().Peek("id"))
+		if clusterID == "" {
+			logger.Error().Msg("Missing cluster_id parameter")
+			ctx.SetStatusCode(fasthttp.StatusBadRequest)
+			ctx.SetBodyString(`{"error": "Missing cluster_id parameter"}`)
+			return
+		}
+		
+		// Remove the cluster from the manager
+		s.multiClusterManager.RemoveCluster(clusterID)
+		
+		logger.Info().Str("cluster_id", clusterID).Msg("Removed cluster from manager")
+		ctx.SetStatusCode(fasthttp.StatusOK)
+		ctx.SetBodyString(fmt.Sprintf(`{"message": "Cluster %s removed successfully"}`, clusterID))
+		
+	default:
+		ctx.SetStatusCode(fasthttp.StatusMethodNotAllowed)
+		ctx.SetBodyString(`{"error": "Method not allowed"}`)
 	}
+}
 
-	// Create FastHTTP server
-	httpServer := &fasthttp.Server{
-		Handler: server.requestHandler,
-		Name:    "k8s-cli API Server",
+// StartAPIServer starts the API server with FastHTTP
+func StartAPIServer(ctx context.Context, clientset *kubernetes.Clientset, factory informers.SharedInformerFactory, host string, port int, appConfig *Config) error {
+	// Initialize the multi-cluster manager
+	multiClusterManager := ctrl.NewMultiClusterManager()
+	
+	// Add the current cluster to the manager
+	// Use the same kubeconfig path determination logic as in runtime.go
+	kubePath := kubeconfig
+	if kubePath == "" && appConfig != nil {
+		kubePath = appConfig.Kubernetes.Kubeconfig
 	}
-
-	log.Info().Str("address", addr).Msg("Starting FastHTTP API server")
-
-	// Start server in a goroutine
+	log.Debug().Str("kubeconfig", kubePath).Msg("Using kubeconfig file for multi-cluster manager")
+	
+	// Check if we're using in-cluster configuration
+	inCluster := false
+	if appConfig != nil {
+		inCluster = appConfig.Kubernetes.InCluster
+	}
+	
+	currentClusterConfig := ctrl.ClusterConfig{
+		Name:       "primary",
+		ClusterID:  "primary-cluster",
+		KubeConfig: kubePath,
+		InCluster:  inCluster, // Use the same setting as the main app
+	}
+	
+	log.Info().Str("cluster_id", currentClusterConfig.ClusterID).Msg("Adding primary cluster to multi-cluster manager")
+	
+	err := multiClusterManager.AddCluster(ctx, currentClusterConfig)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to add primary cluster to manager")
+		return err
+	}
+	
+	// Start all cluster managers
 	go func() {
-		if err := httpServer.ListenAndServe(addr); err != nil {
-			log.Error().Err(err).Msg("Server error")
+		log.Info().Msg("Starting multi-cluster manager")
+		if err := multiClusterManager.StartAll(ctx); err != nil {
+			log.Error().Err(err).Msg("Failed to start multi-cluster manager")
+		}
+	}()
+	
+	server := &apiServer{
+		clientset:          clientset,
+		informerFactory:     factory,
+		multiClusterManager: multiClusterManager,
+	}
+
+	address := fmt.Sprintf("%s:%d", host, port)
+
+	log.Info().Str("address", address).Msg("Starting API server")
+
+	// Create a server instance
+	fasthttpServer := &fasthttp.Server{
+		Handler:            server.requestHandler,
+		Name:               "k8s-controller-api",
+		Concurrency:        1000,
+		DisableKeepalive:   false,
+		MaxRequestBodySize: 10 * 1024 * 1024, // 10MB
+		ReadTimeout:        10 * time.Second,
+		WriteTimeout:       30 * time.Second,
+	}
+
+	// Run the server in a goroutine
+	go func() {
+		if err := fasthttpServer.ListenAndServe(address); err != nil {
+			log.Fatal().Err(err).Msg("Failed to start API server")
 		}
 	}()
 
-	// Wait for context to finish
+	// Wait for context cancellation
 	<-ctx.Done()
-	log.Info().Msg("Shutting down API server...")
 
-	// Give server 5 seconds to finish current requests
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	// Shutdown multi-cluster manager
+	log.Info().Msg("Stopping multi-cluster manager")
+	multiClusterManager.StopAll(ctx)
 
-	if err := httpServer.ShutdownWithContext(shutdownCtx); err != nil {
-		log.Error().Err(err).Msg("Error during server shutdown")
+	// Shutdown server gracefully
+	log.Info().Msg("Shutting down API server")
+	if err := fasthttpServer.Shutdown(); err != nil {
+		log.Error().Err(err).Msg("Error shutting down API server")
 		return err
 	}
 

@@ -88,7 +88,7 @@ func StartComponents(config *Config) error {
 		go func() {
 			defer wg.Done()
 			log.Info().Msg("Starting API server...")
-			if err := StartAPIServer(ctx, clientset, factory, host, port); err != nil {
+			if err := StartAPIServer(ctx, clientset, factory, host, port, config); err != nil {
 				log.Error().Err(err).Msg("Error running API server")
 			}
 		}()

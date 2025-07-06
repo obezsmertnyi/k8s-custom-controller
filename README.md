@@ -1,6 +1,6 @@
 # k8s-cli
 
-A Kubernetes custom controller and CLI tool with advanced configuration management, deployment informer, and API server capabilities.
+A Kubernetes custom controller and CLI tool with advanced configuration management, multi-cluster deployment controller, and API server capabilities.
 
 ## Features
 
@@ -8,8 +8,9 @@ A Kubernetes custom controller and CLI tool with advanced configuration manageme
 
 The application integrates multiple components into a single binary:
 
+- **Multi-Cluster Deployment Controller**: Monitors deployments across multiple Kubernetes clusters simultaneously
 - **Kubernetes Deployment Informer**: Watches for changes in Kubernetes deployments
-- **FastHTTP API Server**: Provides HTTP API access to informer data
+- **FastHTTP API Server**: Provides HTTP API access to cluster data and controllers
 - **CLI Commands**: For direct interaction with Kubernetes resources
 
 ### Configuration Management with Viper
@@ -162,6 +163,110 @@ The application supports different log levels using `zerolog`:
 ./k8s-cli --log-level warn   # Warning conditions
 ./k8s-cli --log-level error  # Error conditions
 ```
+
+## Multi-Cluster Controller
+
+The application includes a production-ready multi-cluster deployment controller that can monitor multiple Kubernetes clusters simultaneously.
+
+### Features
+
+- **Dynamic Cluster Management**: Add and remove clusters at runtime without restart
+- **Structured Event Logging**: Detailed logging of all deployment events with unique IDs
+- **Automatic Reconciliation**: Monitors deployments across all managed clusters
+- **Concurrent Processing**: Each cluster controller runs independently
+- **API Integration**: REST API endpoints for cluster management
+
+### API Endpoints
+
+#### List Managed Clusters
+
+```sh
+curl http://localhost:8080/clusters
+```
+
+Response:
+```json
+{
+  "count": 2,
+  "clusters": {
+    "prod-cluster": {
+      "name": "Production",
+      "cluster_id": "prod-cluster",
+      "kubeconfig": "/path/to/kubeconfig",
+      "context": "production-context",
+      "namespace": "default"
+    },
+    "staging-cluster": {
+      "name": "Staging",
+      "cluster_id": "staging-cluster",
+      "in_cluster": true,
+      "namespace": "default"
+    }
+  }
+}
+```
+
+#### Add a New Cluster
+
+```sh
+curl -X POST http://localhost:8080/clusters \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "production",
+    "cluster_id": "prod-cluster",
+    "kubeconfig": "/path/to/kubeconfig",
+    "context": "production-context",
+    "namespace": "default"
+  }'
+```
+
+Configuration Options:
+- `name`: Human-readable name for the cluster
+- `cluster_id`: Unique identifier for the cluster (used in logs)
+- `kubeconfig`: Path to kubeconfig file (omit for in-cluster config)
+- `context`: Kubernetes context name (optional)
+- `in_cluster`: Boolean, set to true when running inside the cluster
+- `namespace`: Namespace to watch (optional, defaults to all namespaces)
+
+#### Remove a Cluster
+
+```sh
+curl -X DELETE "http://localhost:8080/clusters?id=prod-cluster"
+```
+
+### Logging and Monitoring
+
+The controller logs all deployment events with structured data including:
+- Event ID (UUID)
+- Cluster ID
+- Event type (CREATE, UPDATE, DELETE)
+- Resource information (namespace, name)
+- Replica counts (including old and new values for updates)
+
+Example log entry:
+```
+{"level":"info","event_id":"6ba7b810-9dad-11d1-80b4-00c04fd430c8","cluster_id":"prod-cluster","event_type":"UPDATE","resource_type":"Deployment","namespace":"default","name":"nginx","old_replicas":1,"new_replicas":3,"time":"2025-07-05T10:45:32Z","message":"Deployment replicas changed"}
+```
+
+### How to Test
+
+To verify the multi-cluster controller is working correctly:
+
+1. Start the server component:
+   ```sh
+   ./k8s-cli server --log-level debug
+   ```
+
+2. Add an additional cluster via API:
+   ```sh
+   curl -X POST http://localhost:8080/clusters -H "Content-Type: application/json" -d '{
+     "name": "second-cluster",
+     "cluster_id": "cluster-2",
+     "kubeconfig": "path/to/second-kubeconfig"
+   }'
+   ```
+
+3. Create or update deployments in either cluster and observe the logs showing events from both clusters with their respective cluster_id values.
 
 ## Configuration Example
 
