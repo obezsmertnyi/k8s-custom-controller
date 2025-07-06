@@ -40,9 +40,9 @@ type apiServer struct {
 	// Multi-cluster deployment controller manager
 	multiClusterManager *ctrl.MultiClusterManager
 	// Request rate limiter
-	ipLimiter         *perIPLimiter   // Per-IP rate limiter
-	requestLimiter    *time.Ticker    // Legacy global rate limiter (deprecated)
-	requestLimiterMux sync.Mutex      // Mutex to protect rate limiter initialization
+	ipLimiter         *perIPLimiter // Per-IP rate limiter
+	requestLimiter    *time.Ticker  // Legacy global rate limiter (deprecated)
+	requestLimiterMux sync.Mutex    // Mutex to protect rate limiter initialization
 }
 
 // requestHandler processes HTTP requests with logging
@@ -888,11 +888,11 @@ var enableSwagger bool
 
 // tokenBucket implements a simple token bucket rate limiting algorithm
 type tokenBucket struct {
-	tokens      int           // Current number of tokens
-	capacity    int           // Maximum number of tokens
-	refillRate  int           // Tokens added per second
-	lastRefill  time.Time     // Time of last token refill
-	mu          sync.Mutex    // Mutex for thread safety
+	tokens     int        // Current number of tokens
+	capacity   int        // Maximum number of tokens
+	refillRate int        // Tokens added per second
+	lastRefill time.Time  // Time of last token refill
+	mu         sync.Mutex // Mutex for thread safety
 }
 
 // newTokenBucket creates a new token bucket with the given capacity and refill rate
@@ -900,7 +900,7 @@ func newTokenBucket(tokensPerSecond int) *tokenBucket {
 	return &tokenBucket{
 		tokens:     tokensPerSecond, // Start with full bucket
 		capacity:   tokensPerSecond, // Capacity equals tokens per second
-		refillRate: tokensPerSecond, 
+		refillRate: tokensPerSecond,
 		lastRefill: time.Now(),
 	}
 }
@@ -935,17 +935,17 @@ func (tb *tokenBucket) take() bool {
 
 // perIPLimiter manages rate limiters for individual IP addresses
 type perIPLimiter struct {
-	limiters    map[string]*tokenBucket
-	mu          sync.Mutex
-	tokensPerSec int
+	limiters        map[string]*tokenBucket
+	mu              sync.Mutex
+	tokensPerSec    int
 	cleanupInterval time.Duration
 }
 
 // newPerIPLimiter creates a new per-IP rate limiter
 func newPerIPLimiter(tokensPerSecond int) *perIPLimiter {
 	limiter := &perIPLimiter{
-		limiters:    make(map[string]*tokenBucket),
-		tokensPerSec: tokensPerSecond,
+		limiters:        make(map[string]*tokenBucket),
+		tokensPerSec:    tokensPerSecond,
 		cleanupInterval: 5 * time.Minute,
 	}
 
@@ -1026,7 +1026,7 @@ func (s *apiServer) checkRateLimit(clientIP string, logger zerolog.Logger) bool 
 		// Update rate limit if configuration has changed
 		currentLimit := s.ipLimiter.getLimit()
 		configLimit := s.config.APIServer.Security.RateLimitRequestsPerSecond
-		
+
 		if currentLimit != configLimit {
 			s.ipLimiter.updateLimit(configLimit)
 			logger.Debug().Int("requests_per_second", configLimit).Msg("Rate limit updated")
