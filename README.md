@@ -69,6 +69,7 @@ make docker-run
 
 ```bash
 # Start with default configuration
+cd bin
 ./k8s-cli
 
 # List available commands
