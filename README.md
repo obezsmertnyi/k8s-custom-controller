@@ -4,6 +4,8 @@
 [![Release](https://img.shields.io/github/v/release/obezsmertnyi/k8s-custom-controller)](https://github.com/obezsmertnyi/k8s-custom-controller/releases)
 [![Docker](https://img.shields.io/badge/docker-ghcr.io%2Fobezsmertnyi%2Fk8s--custom--controller-blue)](https://github.com/obezsmertnyi/k8s-custom-controller/pkgs/container/k8s-custom-controller%2Fk8s-custom-controller)
 [![Go Version](https://img.shields.io/badge/go-1.24.4-blue.svg)](https://golang.org/)
+[![Last Commit](https://img.shields.io/github/last-commit/obezsmertnyi/k8s-custom-controller)](https://github.com/obezsmertnyi/k8s-custom-controller/commits)
+[![visitors](https://visitor-badge.laobi.icu/badge?page_id=obezsmertnyi.k8s-custom-controller)](https://github.com/obezsmertnyi/k8s-custom-controller)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 A powerful Kubernetes management tool built with [Cobra CLI](https://github.com/spf13/cobra), [client-go](https://github.com/kubernetes/client-go), and [controller-runtime](https://github.com/kubernetes-sigs/controller-runtime), providing advanced deployment management and real-time event monitoring capabilities.
