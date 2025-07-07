@@ -2,7 +2,7 @@
 
 [![CI Status](https://github.com/obezsmertnyi/k8s-custom-controller/workflows/CI/badge.svg)](https://github.com/obezsmertnyi/k8s-custom-controller/actions)
 [![Release](https://img.shields.io/github/v/release/obezsmertnyi/k8s-custom-controller)](https://github.com/obezsmertnyi/k8s-custom-controller/releases)
-[![Docker](https://img.shields.io/badge/docker-ghcr.io%2Fobezsmertnyi%2Fk8s--custom--controller-blue)](https://github.com/obezsmertnyi/k8s-custom-controller/pkgs/container/k8s-custom-controller/k8s-custom-controller)
+[![Docker](https://img.shields.io/badge/docker-ghcr.io%2Fobezsmertnyi%2Fk8s--custom--controller-blue)](https://github.com/obezsmertnyi/k8s-custom-controller/pkgs/container/k8s-custom-controller%2Fk8s-custom-controller)
 [![Go Version](https://img.shields.io/badge/go-1.24.4-blue.svg)](https://golang.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
