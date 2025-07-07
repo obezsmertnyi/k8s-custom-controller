@@ -89,9 +89,20 @@ func GetInformerOptionsFromViper() (*InformerOptions, error) {
 		opts.Timeout = viper.GetDuration("kubernetes.timeout")
 	}
 
-	// Check if informer is disabled
+	// Check if informer is explicitly enabled/disabled via informer.enabled flag
+	if viper.IsSet("informer.enabled") {
+		// If informer.enabled is false, set DisableInformer to true (inverse logic)
+		opts.DisableInformer = !viper.GetBool("informer.enabled")
+		log.Debug().Bool("informer_enabled", !opts.DisableInformer).Msg("Set informer state from informer.enabled")
+	}
+
+	// Also check if informer is disabled via kubernetes.disable_informer flag (backward compatibility)
 	if viper.IsSet("kubernetes.disable_informer") {
-		opts.DisableInformer = viper.GetBool("kubernetes.disable_informer")
+		// If either informer.enabled=false or kubernetes.disable_informer=true, disable the informer
+		if viper.GetBool("kubernetes.disable_informer") {
+			opts.DisableInformer = true
+			log.Debug().Msg("Informer disabled via kubernetes.disable_informer=true")
+		}
 	}
 
 	log.Info().
@@ -112,22 +123,22 @@ func GetInformerOptionsFromViper() (*InformerOptions, error) {
 
 // SetupInformerDefaults configures default values for the informer in Viper
 func SetupInformerDefaults(v *viper.Viper) {
-	// Установка дефолтных значений для информера
+	// Setting default values for informer
 	defaults := DefaultInformerOptions()
 
-	// Установка значений по умолчанию для пространства имен и периода синхронизации
+	// Set default values for namespace and resync period
 	v.SetDefault("informer.namespace", defaults.Namespace)
 	v.SetDefault("informer.resync_period", defaults.ResyncPeriod)
 	
-	// Установка значений по умолчанию для селекторов
+	// Set default values for selectors
 	v.SetDefault("informer.label_selector", defaults.LabelSelector)
 	v.SetDefault("informer.field_selector", defaults.FieldSelector)
 
-	// Установка значений по умолчанию для логирования
+	// Set default values for logging
 	v.SetDefault("informer.enable_event_logging", defaults.EnableEventLogging)
 	v.SetDefault("informer.log_level", defaults.LogLevel)
 
-	// Установка значений по умолчанию для клиента Kubernetes
+	// Set default values for Kubernetes client
 	v.SetDefault("kubernetes.qps", defaults.QPS)
 	v.SetDefault("kubernetes.burst", defaults.Burst)
 	v.SetDefault("kubernetes.timeout", defaults.Timeout)

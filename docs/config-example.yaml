@@ -11,8 +11,8 @@ api_server:
   port: 8080
   enable_swagger: true
   security:
-    rate_limit_requests_per_second: 3
-    max_connections_per_ip: 2
+    rate_limit_requests_per_second: 1
+    max_connections_per_ip: 10
     idle_timeout_seconds: 120
     read_timeout_seconds: 10
     write_timeout_seconds: 30
@@ -28,12 +28,12 @@ api_server:
 
 informer:
   enabled: true
-  namespace: custom-namespace
+  namespace: default
   resync_period: 2m
   label_selector: environment=production
   field_selector: metadata.name=important-deployment
   logging:
-    enable_event_logging: false
+    enable_event_logging: true
     log_level: debug
   workers:
     count: 2

@@ -193,7 +193,7 @@ Flags:
 ./k8s-cli list
 
 # Create a new deployment
-./k8s-cli create --name nginx-app --image nginx:1.21 --replicas 3 --namespace production
+./k8s-cli create --name nginx-deployment --image nginx:latest --replicas 3 --port 80 --namespace default
 
 # Delete a deployment
 ./k8s-cli delete nginx-app --namespace production
@@ -282,6 +282,63 @@ KCUSTOM_LOGGING_LEVEL=debug
 ```
 
 ## 🌐 API Server
+
+The API server provides endpoints for managing Kubernetes resources. It runs on port 8080 by default.
+
+### API Endpoints
+
+#### Deployments API
+
+**List deployments:**
+
+```bash
+# Get all deployments
+curl http://localhost:8080/deployments
+
+# Get deployments in specific namespace
+curl "http://localhost:8080/deployments?namespace=default"
+
+# Get simplified list of deployments
+curl "http://localhost:8080/deployments?format=simple"
+```
+
+**Create deployment:**
+
+```bash
+curl -X POST http://localhost:8080/deployments \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "test-nginx",
+    "namespace": "default",
+    "image": "nginx:latest",
+    "replicas": 2,
+    "port": 80
+  }'
+```
+
+**Create deployment with custom labels:**
+
+```bash
+curl -X POST http://localhost:8080/deployments \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "my-app",
+    "namespace": "default",
+    "image": "nginx:alpine",
+    "replicas": 3,
+    "port": 8080,
+    "labels": {
+      "environment": "production",
+      "version": "1.0"
+    }
+  }'
+```
+
+**Delete deployment:**
+
+```bash
+curl -X DELETE "http://localhost:8080/deployments?name=test-nginx&namespace=default"
+```
 
 The application exposes a REST API server using the [FastHTTP](https://github.com/valyala/fasthttp) framework for optimal performance. When enabled, it provides access to Kubernetes resources through a JSON API.
 

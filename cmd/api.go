@@ -22,6 +22,8 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/swaggo/swag"
 	"github.com/valyala/fasthttp"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -160,46 +162,100 @@ func (s *apiServer) handleHealth(ctx *fasthttp.RequestCtx) {
 	json.NewEncoder(ctx).Encode(response)
 }
 
-// @Summary Get Kubernetes deployments
-// @Description Returns list of Kubernetes deployments across all connected clusters
+// Structure for POST request to create deployments
+type DeploymentCreateRequest struct {
+	Name      string            `json:"name"`
+	Namespace string            `json:"namespace"`
+	Image     string            `json:"image"`
+	Replicas  int32             `json:"replicas"`
+	Port      int32             `json:"port,omitempty"`
+	Labels    map[string]string `json:"labels,omitempty"`
+}
+
+// @Summary Manage Kubernetes deployments
+// @Description Get, create and delete Kubernetes deployments
 // @Tags kubernetes,deployments
+// @Accept json
 // @Produce json
 // @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
 // @Failure 500 {object} map[string]string
-// @Router /deployments [get]
+// @Router /deployments [get,post,delete]
 func (s *apiServer) handleDeployments(ctx *fasthttp.RequestCtx) {
 	// Get the logger with request ID
 	logger := getRequestLogger(ctx)
-	logger.Info().Msg("Deployments request received")
+	method := string(ctx.Method())
+	
+	logger.Info().Str("method", method).Msg("Deployments request received")
 
-	// Check if informer factory is available
-	if s.informerFactory == nil {
-		logger.Error().Msg("Informer factory not configured")
-		ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
-		json.NewEncoder(ctx).Encode(map[string]string{
-			"error": "Informer factory not configured",
-		})
+	// Check if Kubernetes client is available
+	if !s.checkKubeClient(ctx, logger) {
 		return
 	}
 
+	switch method {
+	case "GET":
+		// Handle GET request for listing deployments
+		s.handleDeploymentsGet(ctx, logger)
+		
+	case "POST":
+		// Handle POST request for creating deployments
+		s.handleDeploymentsPost(ctx, logger)
+		
+	case "DELETE":
+		// Handle DELETE request for removing deployments
+		s.handleDeploymentsDelete(ctx, logger)
+		
+	default:
+		ctx.SetStatusCode(fasthttp.StatusMethodNotAllowed)
+		ctx.SetBodyString(`{"error": "Method not allowed"}`)
+	}
+}
+
+// Handle GET request for listing deployments
+func (s *apiServer) handleDeploymentsGet(ctx *fasthttp.RequestCtx, logger zerolog.Logger) {
 	// Get namespace from query parameter
 	namespace := getNamespaceFromQuery(ctx)
 
-	// Get deployment informer
-	deploymentInformer := s.informerFactory.Apps().V1().Deployments().Informer()
+	// Try to get deployments from informer cache first
+	var deployments []*appsv1.Deployment
+	var source string = "informer-cache"
+	var err error
 
-	// Get deployments from cache
-	deployments, err := informer.ListDeploymentsInCache(deploymentInformer, namespace)
-	if err != nil {
-		logger.Error().Err(err).Str("namespace", namespace).Msg("Failed to list deployments from cache")
-		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
-		json.NewEncoder(ctx).Encode(map[string]string{
-			"error": "Failed to list deployments from cache",
-		})
-		return
+	if s.informerFactory != nil {
+		// Get deployment informer
+		deploymentInformer := s.informerFactory.Apps().V1().Deployments().Informer()
+
+		// Get deployments from cache
+		deployments, err = informer.ListDeploymentsInCache(deploymentInformer, namespace)
+		if err != nil {
+			logger.Warn().Err(err).Str("namespace", namespace).Msg("Failed to list deployments from cache, falling back to direct API")
+			// Reset to try direct API approach
+			deployments = nil
+		}
 	}
 
-	logger.Info().Int("count", len(deployments)).Str("namespace", namespace).Msg("Deployments retrieved from cache")
+	// If informer cache is empty or not available, query directly from the Kubernetes API
+	if len(deployments) == 0 {
+		source = "direct-api"
+		// Query Kubernetes API directly
+		deploymentList, err := s.clientset.AppsV1().Deployments(namespace).List(context.Background(), metav1.ListOptions{})
+		if err != nil {
+			logger.Error().Err(err).Str("namespace", namespace).Msg("Failed to list deployments from API")
+			ctx.SetStatusCode(fasthttp.StatusInternalServerError)
+			json.NewEncoder(ctx).Encode(map[string]string{
+				"error": "Failed to list deployments from API",
+			})
+			return
+		}
+
+		// Convert to slice of pointers for consistency
+		for i := range deploymentList.Items {
+			deployments = append(deployments, &deploymentList.Items[i])
+		}
+	}
+
+	logger.Info().Int("count", len(deployments)).Str("namespace", namespace).Msg("Deployments retrieved from " + source)
 
 	// Set response headers
 	ctx.Response.Header.Set("Content-Type", "application/json")
@@ -224,7 +280,7 @@ func (s *apiServer) handleDeployments(ctx *fasthttp.RequestCtx) {
 	response := map[string]interface{}{
 		"namespace": namespace,
 		"count":     len(deployments),
-		"source":    "informer-cache", // Indicate data comes from cache
+		"source":    source,           // Indicate data source
 		"names":     names,            // Simple names array
 		"items":     []interface{}{},  // Detailed items
 	}
@@ -241,6 +297,181 @@ func (s *apiServer) handleDeployments(ctx *fasthttp.RequestCtx) {
 	response["items"] = items
 
 	// Return detailed JSON response
+	json.NewEncoder(ctx).Encode(response)
+}
+
+// Handle POST request for creating deployments
+func (s *apiServer) handleDeploymentsPost(ctx *fasthttp.RequestCtx, logger zerolog.Logger) {
+	// Parse JSON from request body
+	var req DeploymentCreateRequest
+	if err := json.Unmarshal(ctx.PostBody(), &req); err != nil {
+		logger.Error().Err(err).Msg("Failed to parse request body")
+		ctx.SetStatusCode(fasthttp.StatusBadRequest)
+		ctx.SetBodyString(`{"error": "Invalid JSON in request body"}`)
+		return
+	}
+
+	// Validate required fields
+	if req.Name == "" {
+		ctx.SetStatusCode(fasthttp.StatusBadRequest)
+		ctx.SetBodyString(`{"error": "Name is required"}`)
+		return
+	}
+	if req.Image == "" {
+		ctx.SetStatusCode(fasthttp.StatusBadRequest)
+		ctx.SetBodyString(`{"error": "Image is required"}`)
+		return
+	}
+
+	// Set default values
+	if req.Namespace == "" {
+		req.Namespace = "default"
+	}
+	if req.Replicas == 0 {
+		req.Replicas = 1
+	}
+	if req.Port == 0 {
+		req.Port = 80
+	}
+
+	// Create labels
+	labels := req.Labels
+	if labels == nil {
+		labels = make(map[string]string)
+	}
+	// Add standard label
+	labels["app"] = req.Name
+
+	// Create Deployment object
+	deployment := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      req.Name,
+			Namespace: req.Namespace,
+			Labels:    labels,
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &req.Replicas,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app": req.Name,
+				},
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app": req.Name,
+					},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  req.Name,
+							Image: req.Image,
+							Ports: []corev1.ContainerPort{
+								{
+									ContainerPort: req.Port,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Create deployment in Kubernetes
+	created, err := s.clientset.AppsV1().Deployments(req.Namespace).Create(
+		context.Background(), 
+		deployment, 
+		metav1.CreateOptions{},
+	)
+	if err != nil {
+		logger.Error().Err(err).
+			Str("name", req.Name).
+			Str("namespace", req.Namespace).
+			Msg("Failed to create deployment")
+		
+		// Check if this is an "already exists" error
+		if strings.Contains(err.Error(), "already exists") {
+			ctx.SetStatusCode(fasthttp.StatusConflict)
+			ctx.SetBodyString(`{"error": "Deployment already exists"}`)
+		} else {
+			ctx.SetStatusCode(fasthttp.StatusInternalServerError)
+			ctx.SetBodyString(fmt.Sprintf(`{"error": "Failed to create deployment: %s"}`, err.Error()))
+		}
+		return
+	}
+
+	logger.Info().
+		Str("name", created.Name).
+		Str("namespace", created.Namespace).
+		Str("image", req.Image).
+		Int32("replicas", req.Replicas).
+		Msg("Deployment created successfully")
+
+	// Return created deployment
+	response := map[string]interface{}{
+		"name":      created.Name,
+		"namespace": created.Namespace,
+		"uid":       string(created.UID),
+		"created":   created.CreationTimestamp.Format(time.RFC3339),
+		"message":   "Deployment created successfully",
+	}
+
+	ctx.SetStatusCode(fasthttp.StatusCreated)
+	json.NewEncoder(ctx).Encode(response)
+}
+
+// Handle DELETE request for removing deployments
+func (s *apiServer) handleDeploymentsDelete(ctx *fasthttp.RequestCtx, logger zerolog.Logger) {
+	// Get deployment name from query parameters
+	name := string(ctx.QueryArgs().Peek("name"))
+	if name == "" {
+		ctx.SetStatusCode(fasthttp.StatusBadRequest)
+		ctx.SetBodyString(`{"error": "Name parameter is required"}`)
+		return
+	}
+
+	namespace := getNamespaceFromQuery(ctx)
+	if namespace == "" {
+		namespace = "default"
+	}
+
+	// Delete the deployment
+	err := s.clientset.AppsV1().Deployments(namespace).Delete(
+		context.Background(),
+		name,
+		metav1.DeleteOptions{},
+	)
+	
+	if err != nil {
+		logger.Error().Err(err).
+			Str("name", name).
+			Str("namespace", namespace).
+			Msg("Failed to delete deployment")
+		
+		if strings.Contains(err.Error(), "not found") {
+			ctx.SetStatusCode(fasthttp.StatusNotFound)
+			ctx.SetBodyString(`{"error": "Deployment not found"}`)
+		} else {
+			ctx.SetStatusCode(fasthttp.StatusInternalServerError)
+			ctx.SetBodyString(fmt.Sprintf(`{"error": "Failed to delete deployment: %s"}`, err.Error()))
+		}
+		return
+	}
+
+	logger.Info().
+		Str("name", name).
+		Str("namespace", namespace).
+		Msg("Deployment deleted successfully")
+
+	response := map[string]interface{}{
+		"name":      name,
+		"namespace": namespace,
+		"message":   "Deployment deleted successfully",
+	}
+
+	ctx.SetStatusCode(fasthttp.StatusOK)
 	json.NewEncoder(ctx).Encode(response)
 }
 
@@ -562,6 +793,14 @@ func (s *apiServer) handleClusters(ctx *fasthttp.RequestCtx) {
 	method := string(ctx.Method())
 	logger.Debug().Str("method", method).Msg("Processing clusters request")
 
+	// Check if multiClusterManager is available
+	if s.multiClusterManager == nil {
+		logger.Debug().Msg("Multi-cluster manager is not available (informer disabled)")
+		ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
+		ctx.SetBodyString(`{"error": "Multi-cluster functionality is disabled because informer is disabled"}`)
+		return
+	}
+
 	switch method {
 	case "GET":
 		// Get list of configured clusters
@@ -650,68 +889,87 @@ func (s *apiServer) handleClusters(ctx *fasthttp.RequestCtx) {
 
 // StartAPIServer starts the API server with FastHTTP
 func StartAPIServer(ctx context.Context, clientset *kubernetes.Clientset, factory informers.SharedInformerFactory, host string, port int, appConfig *Config) error {
-	// Initialize the multi-cluster manager
-	multiClusterManager := ctrl.NewMultiClusterManager()
+	// Initialize the multi-cluster manager only if informer is enabled
+	var multiClusterManager *ctrl.MultiClusterManager
 
-	// Add the current cluster to the manager
-	// Use the same kubeconfig path determination logic as in runtime.go
-	kubePath := kubeconfig
-	if kubePath == "" && appConfig != nil {
-		kubePath = appConfig.Kubernetes.Kubeconfig
-	}
-	log.Debug().Str("kubeconfig", kubePath).Msg("Using kubeconfig file for multi-cluster manager")
-
-	// Check if we're using in-cluster configuration
-	inCluster := false
+	// Check if informer is enabled
+	informerEnabled := true // Default to enabled
 	if appConfig != nil {
-		inCluster = appConfig.Kubernetes.InCluster
+		// Informer is disabled if either informer.enabled=false or kubernetes.disable_informer=true
+		informerEnabled = appConfig.Informer.Enabled && !appConfig.Kubernetes.DisableInformer
 	}
 
-	currentClusterConfig := ctrl.ClusterConfig{
-		Name:       "primary",
-		ClusterID:  "primary-cluster",
-		KubeConfig: kubePath,
-		InCluster:  inCluster, // Use the same setting as the main app
-	}
+	// Debug log informer status
+	log.Debug().
+		Bool("informer_enabled", informerEnabled).
+		Msg("MultiClusterManager informer configuration")
 
-	// Apply leader election settings if configured
-	if appConfig != nil && appConfig.ControllerRuntime.LeaderElection.Enabled {
-		currentClusterConfig.LeaderElection.Enabled = true
-		currentClusterConfig.LeaderElection.Namespace = appConfig.ControllerRuntime.LeaderElection.Namespace
-		currentClusterConfig.LeaderElection.ID = appConfig.ControllerRuntime.LeaderElection.ID
+	// Only create and start multiClusterManager if informer is enabled
+	if informerEnabled {
+		multiClusterManager = ctrl.NewMultiClusterManager()
 
-		if appConfig.ControllerRuntime.LeaderElection.ID == "" {
-			currentClusterConfig.LeaderElection.ID = "k8s-custom-controller-leader-election"
+		// Add the current cluster to the manager
+		// Use the same kubeconfig path determination logic as in runtime.go
+		kubePath := kubeconfig
+		if kubePath == "" && appConfig != nil {
+			kubePath = appConfig.Kubernetes.Kubeconfig
+		}
+		log.Debug().Str("kubeconfig", kubePath).Msg("Using kubeconfig file for multi-cluster manager")
+
+		// Check if we're using in-cluster configuration
+		inCluster := false
+		if appConfig != nil {
+			inCluster = appConfig.Kubernetes.InCluster
 		}
 
-		if appConfig.ControllerRuntime.LeaderElection.Namespace == "" {
-			currentClusterConfig.LeaderElection.Namespace = "default"
+		currentClusterConfig := ctrl.ClusterConfig{
+			Name:       "primary",
+			ClusterID:  "primary-cluster",
+			KubeConfig: kubePath,
+			InCluster:  inCluster, // Use the same setting as the main app
 		}
 
-		log.Debug().Bool("enabled", true).Str("id", currentClusterConfig.LeaderElection.ID).Str("namespace", currentClusterConfig.LeaderElection.Namespace).Msg("Configured leader election")
-	}
+		// Apply leader election settings if configured
+		if appConfig != nil && appConfig.ControllerRuntime.LeaderElection.Enabled {
+			currentClusterConfig.LeaderElection.Enabled = true
+			currentClusterConfig.LeaderElection.Namespace = appConfig.ControllerRuntime.LeaderElection.Namespace
+			currentClusterConfig.LeaderElection.ID = appConfig.ControllerRuntime.LeaderElection.ID
 
-	// Apply metrics settings if configured
-	if appConfig != nil && appConfig.ControllerRuntime.Metrics.BindAddress != "" {
-		currentClusterConfig.MetricsBindAddress = appConfig.ControllerRuntime.Metrics.BindAddress
-		log.Debug().Str("bind_address", currentClusterConfig.MetricsBindAddress).Msg("Configured metrics server")
-	}
+			if appConfig.ControllerRuntime.LeaderElection.ID == "" {
+				currentClusterConfig.LeaderElection.ID = "k8s-custom-controller-leader-election"
+			}
 
-	log.Info().Str("cluster_id", currentClusterConfig.ClusterID).Msg("Adding primary cluster to multi-cluster manager")
+			if appConfig.ControllerRuntime.LeaderElection.Namespace == "" {
+				currentClusterConfig.LeaderElection.Namespace = "default"
+			}
 
-	err := multiClusterManager.AddCluster(ctx, currentClusterConfig)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to add primary cluster to manager")
-		return err
-	}
-
-	// Start all cluster managers
-	go func() {
-		log.Info().Msg("Starting multi-cluster manager")
-		if err := multiClusterManager.StartAll(ctx); err != nil {
-			log.Error().Err(err).Msg("Failed to start multi-cluster manager")
+			log.Debug().Bool("enabled", true).Str("id", currentClusterConfig.LeaderElection.ID).Str("namespace", currentClusterConfig.LeaderElection.Namespace).Msg("Configured leader election")
 		}
-	}()
+
+		// Apply metrics settings if configured
+		if appConfig != nil && appConfig.ControllerRuntime.Metrics.BindAddress != "" {
+			currentClusterConfig.MetricsBindAddress = appConfig.ControllerRuntime.Metrics.BindAddress
+			log.Debug().Str("bind_address", currentClusterConfig.MetricsBindAddress).Msg("Configured metrics server")
+		}
+
+		log.Info().Str("cluster_id", currentClusterConfig.ClusterID).Msg("Adding primary cluster to multi-cluster manager")
+
+		err := multiClusterManager.AddCluster(ctx, currentClusterConfig)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to add primary cluster to manager")
+			return err
+		}
+
+		// Start all cluster managers
+		go func() {
+			log.Info().Msg("Starting multi-cluster manager")
+			if err := multiClusterManager.StartAll(ctx); err != nil {
+				log.Error().Err(err).Msg("Failed to start multi-cluster manager")
+			}
+		}()
+	} else {
+		log.Info().Msg("Multi-cluster manager disabled because informer is disabled")
+	}
 
 	// Set up clientset and informer factory for the API server
 	server := &apiServer{
@@ -1039,10 +1297,7 @@ func (s *apiServer) checkRateLimit(clientIP string, logger zerolog.Logger) bool 
 }
 
 func init() {
-	// Add server flags to root command
 	rootCmd.PersistentFlags().StringVar(&serverHost, "host", "0.0.0.0", "Host address to bind the server to")
 	rootCmd.PersistentFlags().IntVar(&serverPort, "port", 8080, "Port to run the server on")
-
-	// Add flag for Swagger documentation (disabled in production by default)
 	rootCmd.PersistentFlags().BoolVar(&enableSwagger, "enable-swagger", false, "Enable Swagger API documentation (development only)")
 }

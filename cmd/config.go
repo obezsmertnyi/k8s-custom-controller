@@ -18,17 +18,17 @@ import (
 type Config struct {
 	// Kubernetes settings
 	Kubernetes struct {
-		Kubeconfig      string        `mapstructure:"kubeconfig"`
-		Context         string        `mapstructure:"context"`
-		Namespace       string        `mapstructure:"namespace"`
-		Timeout         time.Duration `mapstructure:"timeout"`
-		QPS             float32       `mapstructure:"qps"`
-		Burst           int           `mapstructure:"burst"`
-		InCluster       bool          `mapstructure:"in_cluster"`
+		Kubeconfig string        `mapstructure:"kubeconfig"`
+		Context    string        `mapstructure:"context"`
+		Namespace  string        `mapstructure:"namespace"`
+		Timeout    time.Duration `mapstructure:"timeout"`
+		QPS        float32       `mapstructure:"qps"`
+		Burst      int           `mapstructure:"burst"`
+		InCluster  bool          `mapstructure:"in_cluster"`
 		// Deprecated: Use Informer.Enabled and APIServer.Enabled instead
-		DisableInformer bool          `mapstructure:"disable_informer"`
+		DisableInformer bool `mapstructure:"disable_informer"`
 		// Deprecated: Use Informer.Enabled and APIServer.Enabled instead
-		DisableAPI      bool          `mapstructure:"disable_api"`
+		DisableAPI bool `mapstructure:"disable_api"`
 	} `mapstructure:"kubernetes"`
 
 	// Logging settings
@@ -50,12 +50,12 @@ type Config struct {
 			EnableEventLogging bool   `mapstructure:"enable_event_logging"`
 			LogLevel           string `mapstructure:"log_level"`
 		} `mapstructure:"logging"`
-		
+
 		Workers struct {
 			Count int `mapstructure:"count"`
 		} `mapstructure:"workers"`
 	} `mapstructure:"informer"`
-	
+
 	// API Server settings
 	APIServer struct {
 		Enabled       bool   `mapstructure:"enabled"`
@@ -65,19 +65,19 @@ type Config struct {
 
 		// Security settings
 		Security struct {
-			RateLimitRequestsPerSecond int `mapstructure:"rate_limit_requests_per_second"`
-			MaxConnsPerIP             int `mapstructure:"max_connections_per_ip"`
-			ReadTimeoutSeconds        int `mapstructure:"read_timeout_seconds"`
-			WriteTimeoutSeconds       int `mapstructure:"write_timeout_seconds"`
-			IdleTimeoutSeconds        int `mapstructure:"idle_timeout_seconds"`
-			DisableKeepalive          bool `mapstructure:"disable_keepalive"`
+			RateLimitRequestsPerSecond int  `mapstructure:"rate_limit_requests_per_second"`
+			MaxConnsPerIP              int  `mapstructure:"max_connections_per_ip"`
+			ReadTimeoutSeconds         int  `mapstructure:"read_timeout_seconds"`
+			WriteTimeoutSeconds        int  `mapstructure:"write_timeout_seconds"`
+			IdleTimeoutSeconds         int  `mapstructure:"idle_timeout_seconds"`
+			DisableKeepalive           bool `mapstructure:"disable_keepalive"`
 		} `mapstructure:"security"`
-		
+
 		// Swagger UI specific settings
 		SwaggerUI struct {
-			Enabled      bool   `mapstructure:"enabled"` 
-			CORSEnabled     bool   `mapstructure:"cors_enabled"`
-			CORSAllowOrigin string `mapstructure:"cors_allow_origin"`
+			Enabled          bool   `mapstructure:"enabled"`
+			CORSEnabled      bool   `mapstructure:"cors_enabled"`
+			CORSAllowOrigin  string `mapstructure:"cors_allow_origin"`
 			CORSAllowMethods string `mapstructure:"cors_allow_methods"`
 			CORSAllowHeaders string `mapstructure:"cors_allow_headers"`
 			CORSMaxAge       int    `mapstructure:"cors_max_age"`
@@ -111,6 +111,7 @@ func homeDir() string {
 // LoadConfig loads configuration from file and environment variables
 // Exported function for use in tests and other packages
 func LoadConfig() (*Config, error) {
+	// Initialize config with default values
 	config := &Config{}
 
 	// Set default values for Kubernetes
@@ -118,9 +119,9 @@ func LoadConfig() (*Config, error) {
 	config.Kubernetes.QPS = 50
 	config.Kubernetes.Burst = 100
 	config.Kubernetes.Namespace = "default"
-	config.Kubernetes.InCluster = false // Use kubeconfig by default
+	config.Kubernetes.InCluster = false       // Use kubeconfig by default
 	config.Kubernetes.DisableInformer = false // Enable informer by default
-	config.Kubernetes.DisableAPI = false // Enable API by default
+	config.Kubernetes.DisableAPI = false      // Enable API by default
 
 	// Default values for logging
 	config.Logging.Level = "info"
@@ -167,18 +168,25 @@ func LoadConfig() (*Config, error) {
 	}
 
 	// Configure Viper
+	// Clear any potential previous configuration to avoid conflicts
+	viper.Reset()
+
+	// Set config type explicitly
+	viper.SetConfigType("yaml")
+
 	// Automatically use environment variables
 	viper.AutomaticEnv()
 	viper.SetEnvPrefix("KCUSTOM") // KCUSTOM_KUBERNETES_NAMESPACE
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
+	// Set search paths for config file
 	if cfgFile != "" {
 		// Use configuration file specified via --config flag
+		log.Debug().Str("config_file_path", cfgFile).Msg("Using specified config file")
 		viper.SetConfigFile(cfgFile)
 	} else {
 		// Look for default configuration file
 		viper.SetConfigName("config")
-		viper.SetConfigType("yaml")
 
 		// Search for configuration file in standard locations
 		viper.AddConfigPath(".")
@@ -187,7 +195,7 @@ func LoadConfig() (*Config, error) {
 	}
 
 	// Explicitly bind environment variables to configuration keys
-	
+
 	// Kubernetes configuration
 	viper.BindEnv("kubernetes.namespace", "KUBERNETES_NAMESPACE")
 	viper.BindEnv("kubernetes.kubeconfig", "KUBERNETES_KUBECONFIG")
@@ -198,7 +206,7 @@ func LoadConfig() (*Config, error) {
 	viper.BindEnv("kubernetes.in_cluster", "KUBERNETES_IN_CLUSTER")
 	viper.BindEnv("kubernetes.disable_informer", "KUBERNETES_DISABLE_INFORMER")
 	viper.BindEnv("kubernetes.disable_api", "KUBERNETES_DISABLE_API")
-	
+
 	// Logging configuration
 	viper.BindEnv("logging.level", "LOGGING_LEVEL")
 	viper.BindEnv("logging.format", "LOGGING_FORMAT")
@@ -212,7 +220,7 @@ func LoadConfig() (*Config, error) {
 	viper.BindEnv("informer.logging.enable_event_logging", "INFORMER_LOGGING_ENABLE_EVENT_LOGGING")
 	viper.BindEnv("informer.logging.log_level", "INFORMER_LOGGING_LOG_LEVEL")
 	viper.BindEnv("informer.workers.count", "INFORMER_WORKERS_COUNT")
-	
+
 	// API Server configuration
 	viper.BindEnv("api_server.enabled", "APISERVER_ENABLED")
 	viper.BindEnv("api_server.host", "APISERVER_HOST")
@@ -240,38 +248,121 @@ func LoadConfig() (*Config, error) {
 		} else {
 			// For default config search path, it's just a warning
 			log.Debug().Err(err).Msg("No default config file found")
-			log.Warn().Msg("Using defaults and environment variables")
+			log.Info().Msg("Using defaults and environment variables only")
 			// Continue with defaults and env vars
 		}
 	} else {
-		log.Info().Str("config", viper.ConfigFileUsed()).Msg("Using config file:")
+		log.Info().Str("config", viper.ConfigFileUsed()).Msg("Using config file")
+
+		// Dump all keys found in the configuration file for debugging
+		fmt.Println("DEBUG: All config keys and values:")
+		for _, key := range viper.AllKeys() {
+			fmt.Printf("DEBUG: Key: '%s' = '%v'\n", key, viper.Get(key))
+		}
+
+		// Specifically check if logging.level exists and what its value is
+		if viper.IsSet("logging.level") {
+			fmt.Printf("DEBUG: Found logging.level = '%s'\n", viper.GetString("logging.level"))
+		} else {
+			fmt.Println("DEBUG: logging.level is NOT SET in config")
+		}
+
+		// Unmarshal configuration before explicit overrides
+		err = viper.Unmarshal(config)
+		if err != nil {
+			return nil, fmt.Errorf("unable to decode config: %v", err)
+		}
+
+		// Explicitly apply logging configuration
+		// This ensures the values from the config file are properly applied
+		if viper.IsSet("logging.level") {
+			config.Logging.Level = viper.GetString("logging.level")
+			fmt.Printf("DEBUG: Explicitly set config.Logging.Level = '%s'\n", config.Logging.Level)
+		}
+
+		if viper.IsSet("logging.format") {
+			config.Logging.Format = viper.GetString("logging.format")
+			fmt.Printf("DEBUG: Explicitly set config.Logging.Format = '%s'\n", config.Logging.Format)
+		}
+
+		// Explicitly set important values from Viper to ensure they're properly loaded
+		if viper.IsSet("informer.enabled") {
+			enabled := viper.GetBool("informer.enabled")
+			config.Informer.Enabled = enabled
+			log.Debug().Bool("informer_enabled", enabled).Msg("Explicitly set informer.enabled from config file")
+		}
+
+		if viper.IsSet("controller_runtime.leader_election.enabled") {
+			enabled := viper.GetBool("controller_runtime.leader_election.enabled")
+			config.ControllerRuntime.LeaderElection.Enabled = enabled
+			log.Debug().Bool("leader_election_enabled", enabled).Msg("Explicitly set leader_election.enabled from config file")
+		}
+
+		if viper.IsSet("informer.logging.enable_event_logging") {
+			enabled := viper.GetBool("informer.logging.enable_event_logging")
+			config.Informer.Logging.EnableEventLogging = enabled
+			log.Debug().Bool("enable_event_logging", enabled).Msg("Explicitly set informer.logging.enable_event_logging from config file")
+		}
+
+		// Explicitly handle logging level from config file
+		if viper.IsSet("logging.level") {
+			level := viper.GetString("logging.level")
+			config.Logging.Level = level
+			log.Debug().Str("log_level", level).Msg("Explicitly set logging.level from config file")
+		}
+
+		// Explicitly handle logging format from config file
+		if viper.IsSet("logging.format") {
+			format := viper.GetString("logging.format")
+			config.Logging.Format = format
+			log.Debug().Str("log_format", format).Msg("Explicitly set logging.format from config file")
+		}
 	}
 
-	// Bind environment variables to configuration
-	err = viper.Unmarshal(config)
-	if err != nil {
-		return nil, fmt.Errorf("unable to decode config: %v", err)
-	}
+	// Load additional values from environment variables
+	// No need for another viper.Unmarshal() as we've already done that for the config file
 
-	// Override values from command line flags
-	if logLevel != "" {
-		config.Logging.Level = logLevel
-	}
-	
-	// Override port from command line flags
-	if serverPort != 0 {
-		config.APIServer.Port = serverPort
-	}
-	
-	// Override metrics port from command line flags
-	if metricsPort != 0 {
-		config.ControllerRuntime.Metrics.BindAddress = fmt.Sprintf(":%d", metricsPort)
-	}
-	
-	// Override enable swagger from command line flags
-	if enableSwagger {
-		config.APIServer.EnableSwagger = true
-	}
+	// Debug: print actual configuration values after loading from file
+	log.Debug().Bool("informer_enabled_after_unmarshal", config.Informer.Enabled).Msg("Loaded informer.enabled value")
+	log.Debug().Bool("controller_runtime_leaderelection_enabled", config.ControllerRuntime.LeaderElection.Enabled).Msg("Loaded controller_runtime.leader_election.enabled value")
+
+	// Flag overrides are now handled in rootCmd's Run function in root.go
+	// to ensure they only override the config when explicitly set by the user.
+	// This allows the config file values to be preserved when flags are not specified.
+
+	// Only handle non-command-specific logging level here
+	// because it's needed before rootCmd's Run function is called
+	// if logLevel != "" {
+	// 	config.Logging.Level = logLevel
+	// }
+
+	// Add detailed debug logging for loaded API server configuration
+	log.Debug().
+		Int("api_server_port", config.APIServer.Port).
+		Bool("api_server_enabled", config.APIServer.Enabled).
+		Bool("api_server_swagger_enabled", config.APIServer.EnableSwagger).
+		Str("api_server_host", config.APIServer.Host).
+		Msg("Loaded API server configuration")
+
+	// Add detailed debug logging for metrics configuration
+	log.Debug().
+		Str("metrics_bind_address", config.ControllerRuntime.Metrics.BindAddress).
+		Msg("Loaded metrics configuration")
+
+	// Add detailed debug logging for leader election configuration
+	log.Debug().
+		Bool("leader_election_enabled", config.ControllerRuntime.LeaderElection.Enabled).
+		Str("leader_election_id", config.ControllerRuntime.LeaderElection.ID).
+		Str("leader_election_namespace", config.ControllerRuntime.LeaderElection.Namespace).
+		Msg("Loaded leader election configuration")
+
+	// Add detailed debug logging for informer configuration
+	log.Debug().
+		Bool("informer_enabled", config.Informer.Enabled).
+		Str("informer_namespace", config.Informer.Namespace).
+		Str("informer_label_selector", config.Informer.LabelSelector).
+		Str("informer_field_selector", config.Informer.FieldSelector).
+		Msg("Loaded informer configuration")
 
 	return config, nil
 }
@@ -279,6 +370,10 @@ func LoadConfig() (*Config, error) {
 // ConfigCmd creates a command for working with configuration
 // ToInformerOptions converts Config to informer.InformerOptions
 func (c *Config) ToInformerOptions() *informer.InformerOptions {
+	// Take into account both informer.enabled and kubernetes.disable_informer settings
+	// If informer.enabled is false, we want to disable the informer regardless of kubernetes.disable_informer
+	disableInformer := c.Kubernetes.DisableInformer || !c.Informer.Enabled
+
 	opts := &informer.InformerOptions{
 		Namespace:          c.Informer.Namespace,
 		ResyncPeriod:       c.Informer.ResyncPeriod,
@@ -289,7 +384,7 @@ func (c *Config) ToInformerOptions() *informer.InformerOptions {
 		QPS:                c.Kubernetes.QPS,
 		Burst:              c.Kubernetes.Burst,
 		Timeout:            c.Kubernetes.Timeout,
-		DisableInformer:    c.Kubernetes.DisableInformer,
+		DisableInformer:    disableInformer,
 	}
 
 	log.Debug().
